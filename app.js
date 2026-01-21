@@ -69,41 +69,55 @@ function setupEventListeners() {
 
 async function loadInitialData() {
     try {
-        setLoading(true, 'Fetching latest data...');
+        setLoading(true, 'Initial loading...');
         await fetchAuctionInfo();
 
-        // 1. Fetch latest cached results via Proxy
+        const safeInterval = getSafeInterval();
+        const now = Date.now();
+
+        // 1. Check Local Persistent Cache First
+        const localCache = JSON.parse(localStorage.getItem('dune_results_cache') || 'null');
+
+        if (localCache && localCache.rows && localCache.timestamp) {
+            const cacheAge = now - localCache.timestamp;
+            console.log(`Local cache found. Age: ${Math.round(cacheAge / 1000)}s | Safe: ${Math.round(safeInterval / 1000)}s`);
+
+            if (cacheAge < safeInterval) {
+                console.log('Using Local Cache - No network requests needed.');
+                updateDataAge(localCache.timestamp);
+                processDuneResults(localCache.rows, false); // false = don't re-save
+                updateConnectionStatus('connected');
+                scheduleNextRefresh();
+                return; // EXIT EARLY - NO NETWORK CALLS
+            }
+        }
+
+        console.log('No fresh local cache, fetching from Dune...');
+        // 2. Fetch latest cached results via Proxy
         const cachedData = await fetchLatestDuneResults(DUNE_QUERY_ID);
         updateConnectionStatus('connected');
 
-        // 2. Check stale/schema
-        const safeInterval = getSafeInterval();
         const lastExecution = new Date(cachedData.execution_ended_at).getTime();
-        const now = Date.now();
         const age = now - lastExecution;
-
-        // Show age in UI immediately
         updateDataAge(lastExecution);
-
-        console.log(`Data age: ${Math.round(age / 1000)}s | Safe Interval: ${Math.round(safeInterval / 1000)}s`);
 
         const rows = cachedData.result?.rows || [];
         const hasTimeColumn = rows[0] && (rows[0].last_bid_time !== undefined);
 
+        const lastPaidRefresh = Number(localStorage.getItem('lastPaidRefresh') || 0);
+        const timeSincePaidRefresh = now - lastPaidRefresh;
+
         if (rows.length > 0 && !hasTimeColumn) {
-            console.log('Cache missing new columns, forcing refresh...');
             refreshInBackground();
-        } else if (age > safeInterval) {
-            console.log('Data is stale beyond safe interval, refreshing...');
+        } else if (age > safeInterval && timeSincePaidRefresh > safeInterval) {
             refreshInBackground();
         } else {
-            console.log('Data is fresh enough, skipping background refresh.');
             scheduleNextRefresh();
         }
 
     } catch (e) {
         console.error(e);
-        setLoading(true, `Error getting cache, retrying full fetch...`);
+        setLoading(true, `Error loading data, retrying...`);
         try {
             await executeDuneQuery();
             updateConnectionStatus('connected');
@@ -116,8 +130,7 @@ async function loadInitialData() {
 
 
 async function refreshInBackground() {
-    console.log('Starting background refresh...');
-    elements.lastUpdated.textContent = 'Updating...';
+    console.log('Starting background refresh check...');
     try {
         await executeDuneQuery();
     } catch (e) {
@@ -186,8 +199,9 @@ async function executeDuneQuery() {
         return;
     }
 
-    // Record this attempt immediately
+    // Record this attempt and update UI ONLY if we actually proceed
     localStorage.setItem('lastPaidRefresh', now.toString());
+    elements.lastUpdated.textContent = 'Updating...';
 
     const executeData = await fetchDuneData(`query/${DUNE_QUERY_ID}/execute`, { method: 'POST' });
     const executionId = executeData.execution_id;
@@ -216,7 +230,14 @@ async function executeDuneQuery() {
     throw new Error('Dune query timed out');
 }
 
-function processDuneResults(rows) {
+function processDuneResults(rows, saveToCache = true) {
+    if (saveToCache) {
+        localStorage.setItem('dune_results_cache', JSON.stringify({
+            timestamp: Date.now(),
+            rows: rows
+        }));
+    }
+
     bidders.clear();
     for (const row of rows) {
         if (!row.bidder_address) continue;
