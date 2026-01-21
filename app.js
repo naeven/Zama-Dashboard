@@ -40,6 +40,7 @@ const elements = {
     sortBy: document.getElementById('sortBy'),
     sortOrder: document.getElementById('sortOrder'),
     lastUpdated: document.getElementById('lastUpdated'),
+    dataAge: document.getElementById('dataAge'),
     chartSection: document.querySelector('.chart-section'),
     chartLegend: document.getElementById('chartLegend')
 };
@@ -80,6 +81,9 @@ async function loadInitialData() {
         const lastExecution = new Date(cachedData.execution_ended_at).getTime();
         const now = Date.now();
         const age = now - lastExecution;
+
+        // Show age in UI immediately
+        updateDataAge(lastExecution);
 
         console.log(`Data age: ${Math.round(age / 1000)}s | Safe Interval: ${Math.round(safeInterval / 1000)}s`);
 
@@ -418,5 +422,12 @@ function formatRelativeTime(ts) {
     return Math.floor(diff / 86400000) + 'd ago';
 }
 function truncateAddress(a) { return a.slice(0, 8) + '...' + a.slice(-6); }
-function updateLastUpdated() { elements.lastUpdated.textContent = new Date().toLocaleTimeString(); }
+function updateLastUpdated() {
+    elements.lastUpdated.textContent = new Date().toLocaleTimeString();
+}
+
+function updateDataAge(timestamp) {
+    if (!timestamp || !elements.dataAge) return;
+    elements.dataAge.textContent = formatRelativeTime(timestamp).toUpperCase();
+}
 function debounce(f, w) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), w); }; }

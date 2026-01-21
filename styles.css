@@ -114,7 +114,28 @@ body {
 .header-actions {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: 32px;
+}
+
+.update-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.info-label {
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--zama-grey);
+    font-weight: 700;
+}
+
+.last-updated {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--zama-white);
 }
 
 /* Buttons */
