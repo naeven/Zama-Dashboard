@@ -176,6 +176,19 @@ async function fetchLatestDuneResults(queryId) {
 }
 
 async function executeDuneQuery() {
+    // Check local rate limit again before spending money
+    const now = Date.now();
+    const safeInterval = getSafeInterval();
+    const lastPaidRefresh = Number(localStorage.getItem('lastPaidRefresh') || 0);
+
+    if (now - lastPaidRefresh < safeInterval) {
+        console.warn('Paid refresh blocked by local rate limit.');
+        return;
+    }
+
+    // Record this attempt immediately
+    localStorage.setItem('lastPaidRefresh', now.toString());
+
     const executeData = await fetchDuneData(`query/${DUNE_QUERY_ID}/execute`, { method: 'POST' });
     const executionId = executeData.execution_id;
 
