@@ -230,14 +230,7 @@ async function executeDuneQuery() {
     throw new Error('Dune query timed out');
 }
 
-function processDuneResults(rows, saveToCache = true) {
-    if (saveToCache) {
-        localStorage.setItem('dune_results_cache', JSON.stringify({
-            timestamp: Date.now(),
-            rows: rows
-        }));
-    }
-
+function processDuneResults(rows) {
     bidders.clear();
     for (const row of rows) {
         if (!row.bidder_address) continue;

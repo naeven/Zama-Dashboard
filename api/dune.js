@@ -31,7 +31,13 @@ export default async function handler(req, res) {
 
         const data = await response.json();
 
-        // 5. Return the response to the frontend
+        // 5. Add Cache-Control for GET requests (results fetching)
+        if (req.method === 'GET' && response.status === 200) {
+            // Cache in CDN for 35 minutes (2100 seconds)
+            res.setHeader('Cache-Control', 's-maxage=2100, stale-while-revalidate=60');
+        }
+
+        // 6. Return the response to the frontend
         return res.status(response.status).json(data);
 
     } catch (error) {
