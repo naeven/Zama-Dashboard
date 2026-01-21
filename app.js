@@ -111,6 +111,10 @@ async function loadInitialData() {
 
 async function refresh() {
     if (isLoading) return;
+
+    const confirmMsg = "Manual refresh costs 10 Dune Credits. Proceed?";
+    if (!confirm(confirmMsg)) return;
+
     try {
         setLoading(true, 'Refreshing data...');
         await fetchAuctionInfo();
@@ -136,26 +140,30 @@ async function refreshInBackground() {
 }
 
 function scheduleNextRefresh() {
-    if (!auctionConfig) {
-        setTimeout(refreshInBackground, FALLBACK_INTERVAL);
-        return;
-    }
+    const interval = getSafeInterval();
+    console.log(`Next Auto-Refresh in: ${Math.round(interval / 60000)}m`);
+    setTimeout(refreshInBackground, interval);
+}
+
+function getSafeInterval() {
+    if (!auctionConfig) return FALLBACK_INTERVAL;
 
     const now = Date.now();
     const endTime = auctionConfig.endAuctionTime * 1000;
     const remainingTime = endTime - now;
 
-    if (remainingTime <= 0) return;
+    if (remainingTime <= 0) return FALLBACK_INTERVAL;
 
     const safeCredits = DUNE_CREDITS_REMAINING * SAFETY_FACTOR;
     const allowedQueries = Math.floor(safeCredits / COST_PER_QUERY);
 
-    if (allowedQueries <= 0) return;
+    if (allowedQueries <= 0) return FALLBACK_INTERVAL;
 
     let calculatedInterval = Math.floor(remainingTime / allowedQueries);
-    if (calculatedInterval < MIN_REFRESH_INTERVAL) calculatedInterval = MIN_REFRESH_INTERVAL;
 
-    setTimeout(refreshInBackground, calculatedInterval);
+    // Ensure we don't refresh faster than MIN_REFRESH_INTERVAL
+    // but also not so fast that we burn credits if users refresh page
+    return Math.max(calculatedInterval, MIN_REFRESH_INTERVAL);
 }
 
 // --- Dune Proxy Helpers ---
