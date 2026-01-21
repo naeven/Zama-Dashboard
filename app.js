@@ -172,70 +172,7 @@ function scheduleNextRefresh() {
     setTimeout(refreshInBackground, calculatedInterval);
 }
 
-async function fetchLatestDuneResults(apiKey, queryId) {
-    const resp = await fetch(`https://api.dune.com/api/v1/query/${queryId}/results`, {
-        headers: { 'X-Dune-Api-Key': apiKey }
-    });
 
-    if (!resp.ok) {
-        throw new Error('No cached results available');
-    }
-
-    const data = await resp.json();
-    if (data.result && data.result.rows) {
-        processDuneResults(data.result.rows);
-    }
-    return data;
-}
-
-async function executeDuneQuery(apiKey, queryId) {
-    // 1. Execute Query
-    const executeResp = await fetch(`https://api.dune.com/api/v1/query/${queryId}/execute`, {
-        method: 'POST',
-        headers: { 'X-Dune-Api-Key': apiKey }
-    });
-
-    if (!executeResp.ok) {
-        const err = await executeResp.json();
-        throw new Error(err.error || 'Failed to execute Dune query');
-    }
-
-    const executeData = await executeResp.json();
-    const executionId = executeData.execution_id;
-
-    // 2. Poll for Results
-    let attempts = 0;
-    while (attempts < 60) {
-        attempts++;
-        // Do not update main loading screen if we have data
-        if (bidders.size === 0) {
-            setLoading(true, `Waiting for Dune results... (${attempts * 2}s)`);
-        } else {
-            // Maybe update status text slightly?
-            elements.lastUpdated.textContent = `Updating... (${attempts * 2}s)`;
-        }
-
-        await new Promise(r => setTimeout(r, 2000));
-
-        const statusResp = await fetch(`https://api.dune.com/api/v1/execution/${executionId}/results`, {
-            headers: { 'X-Dune-Api-Key': apiKey }
-        });
-
-        if (!statusResp.ok) throw new Error('Failed to check execution status');
-
-        const statusData = await statusResp.json();
-
-        if (statusData.state === 'QUERY_STATE_COMPLETED') {
-            processDuneResults(statusData.result.rows);
-            setLoading(false);
-            return;
-        } else if (statusData.state === 'QUERY_STATE_FAILED') {
-            throw new Error(`Dune Query Failed: ${statusData.error || 'Unknown error'}`);
-        }
-    }
-
-    throw new Error('Dune query timed out');
-}
 
 function processDuneResults(rows) {
     bidders.clear();
