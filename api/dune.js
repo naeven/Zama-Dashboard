@@ -42,8 +42,9 @@ export default async function handler(req, res) {
         // 5. Smart Global Caching logic
         if (req.method === 'GET' && response.status === 200) {
 
-            // Default: short cache to allow updates if stale
-            let cacheDuration = 60; // 1 minute
+            // Default: 5 minute cache for STALE data (gives time for update to propagate)
+            // This prevents "flickering" where a second user triggers a duplicate update immediately.
+            let cacheDuration = 300; // 5 minutes (was 60)
 
             // Check data freshness
             if (data.execution_ended_at) {
@@ -58,8 +59,16 @@ export default async function handler(req, res) {
                 }
             }
 
-            // Set the dynamic header
-            res.setHeader('Cache-Control', `s-maxage=${cacheDuration}, stale-while-revalidate=30`);
+            // Special Cache for Execution IDs (Thundering Herd Protection)
+            // If we just triggered an execution, cache that ID for 5 mins so everyone joins it.
+            if (endpoint.endsWith('/execute')) {
+                // Force 5 mins for execution IDs regardless of other logic
+                cacheDuration = 300;
+                res.setHeader('Cache-Control', `s-maxage=300, stale-while-revalidate=60`);
+            } else {
+                // Normal Results Logic
+                res.setHeader('Cache-Control', `s-maxage=${cacheDuration}, stale-while-revalidate=60`);
+            }
         }
 
         // 6. Return the response to the frontend
