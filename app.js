@@ -203,7 +203,9 @@ async function executeDuneQuery() {
     localStorage.setItem('lastPaidRefresh', now.toString());
     elements.lastUpdated.textContent = 'Updating...';
 
-    const executeData = await fetchDuneData(`query/${DUNE_QUERY_ID}/execute`, { method: 'POST' });
+    // Use GET (handled by proxy as POST) so we can cache the Execution ID globally for 60s
+    // This prevents "Thundering Herd" where 100 users trigger 100 credits.
+    const executeData = await fetchDuneData(`query/${DUNE_QUERY_ID}/execute`);
     const executionId = executeData.execution_id;
 
     let attempts = 0;

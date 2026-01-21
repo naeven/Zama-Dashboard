@@ -17,16 +17,23 @@ export default async function handler(req, res) {
     // 3. Construct the target URL
     const targetUrl = `https://api.dune.com/api/v1/${endpoint}`;
 
+    // SPECIAL: Allow "GET" to trigger execution (so we can cache the Execution ID globally)
+    // If endpoint ends in /execute and method is GET, force POST upstream.
+    let upstreamMethod = req.method;
+    if (req.method === 'GET' && endpoint.endsWith('/execute')) {
+        upstreamMethod = 'POST';
+    }
+
     try {
         // 4. Forward the request
         const response = await fetch(targetUrl, {
-            method: req.method,
+            method: upstreamMethod,
             headers: {
                 'X-Dune-Api-Key': DUNE_API_KEY,
                 'Content-Type': 'application/json'
             },
-            // Forward body if it's a POST request (e.g. executing a query)
-            body: (req.method === 'POST' || req.method === 'PUT') ? JSON.stringify(req.body) : undefined
+            // Forward body if it's a POST/PUT request
+            body: (upstreamMethod === 'POST' || upstreamMethod === 'PUT') ? JSON.stringify(req.body) : undefined
         });
 
         const data = await response.json();
