@@ -59,7 +59,6 @@ async function init() {
 }
 
 function setupEventListeners() {
-    elements.refreshBtn.addEventListener('click', refresh);
     elements.searchInput.addEventListener('input', debounce(renderTable, 300));
     elements.sortBy.addEventListener('change', renderTable);
     elements.sortOrder.addEventListener('change', renderTable);
@@ -77,10 +76,12 @@ async function loadInitialData() {
         updateConnectionStatus('connected');
 
         // 2. Check stale/schema
-        const STALE_THRESHOLD = 5 * 60 * 1000;
+        const safeInterval = getSafeInterval();
         const lastExecution = new Date(cachedData.execution_ended_at).getTime();
         const now = Date.now();
         const age = now - lastExecution;
+
+        console.log(`Data age: ${Math.round(age / 1000)}s | Safe Interval: ${Math.round(safeInterval / 1000)}s`);
 
         const rows = cachedData.result?.rows || [];
         const hasTimeColumn = rows[0] && (rows[0].last_bid_time !== undefined);
@@ -88,8 +89,8 @@ async function loadInitialData() {
         if (rows.length > 0 && !hasTimeColumn) {
             console.log('Cache missing new columns, forcing refresh...');
             refreshInBackground();
-        } else if (age > STALE_THRESHOLD) {
-            console.log('Data is stale, refreshing in background...');
+        } else if (age > safeInterval) {
+            console.log('Data is stale beyond safe interval, refreshing...');
             refreshInBackground();
         } else {
             console.log('Data is fresh enough, skipping background refresh.');
