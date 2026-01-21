@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.9.0/ethers.umd.min.js"></script>
+</head>
+
+<body>
+    <script>
+        window.onload = function () {
+            try {
+                const bidHash = ethers.id('BidSubmitted(uint256,address,bytes32,uint64,bytes32)');
+                const unwrapHash = ethers.id('UnwrapFinalized(address,bytes32,uint64)');
+                console.log('BidSubmitted:', bidHash);
+                console.log('UnwrapFinalized:', unwrapHash);
+                document.body.innerHTML = `Bid: ${bidHash}<br>Unwrap: ${unwrapHash}`;
+            } catch (e) {
+                console.error(e);
+            }
+        };
+    </script>
+</body>
+
+</html>

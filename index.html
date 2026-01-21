@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zama Auction Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.9.0/ethers.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <a href="https://x.com/Naeven_" target="_blank" class="logo">
+                    <img src="-kxNqh4Q_400x400.jpg" alt="Naeven" class="profile-logo">
+                    <div class="logo-text">
+                        <h1>Zama Auction</h1>
+                        <span class="subtitle">Built by Naeven</span>
+                    </div>
+                </a>
+                <div class="header-actions">
+                    <button id="refreshBtn" class="btn btn-primary">
+                        Refresh
+                    </button>
+                    <div class="connection-status" id="connectionStatus">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Connecting...</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Stats Section -->
+        <section class="stats-section">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-label">Total Bidders</span>
+                    <span class="stat-value" id="totalBidders">-</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Total Bids</span>
+                    <span class="stat-value" id="totalBids">-</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">TVS (TOTAL VALUE SHIELDED)</span>
+                    <span class="stat-value" id="totalShielded">-</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Chart Section -->
+        <!-- Chart Section (Now just List) -->
+        <section class="chart-section" style="display: none;">
+            <div id="chartLegend" class="chart-legend"></div>
+        </section>
+
+        <!-- Auction Info -->
+        <section class="auction-info" id="auctionInfo">
+            <div class="info-row">
+                <div class="info-item">
+                    <span class="info-label">Auction Start</span>
+                    <span class="info-value" id="auctionStart">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Auction End</span>
+                    <span class="info-value" id="auctionEnd">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Token Supply</span>
+                    <span class="info-value" id="tokenSupply">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Status</span>
+                    <span class="info-value status-badge" id="auctionStatus">-</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Filters -->
+            <div class="filters-bar">
+                <div class="search-box">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8" />
+                        <path d="M21 21l-4.35-4.35" />
+                    </svg>
+                    <input type="text" id="searchInput" placeholder="Search by address...">
+                </div>
+                <div class="filter-options">
+                    <select id="sortBy">
+                        <option value="netShielded">Sort by Net Shielded</option>
+                        <option value="time">Sort by Last Bid</option>
+                        <option value="fdv">Sort by Bid FDV</option>
+                        <option value="wrapped">Sort by Wrapped</option>
+                        <option value="unwrapped">Sort by Unwrapped</option>
+                        <option value="bids">Sort by Bid Count</option>
+                    </select>
+                    <select id="sortOrder">
+                        <option value="desc">Descending</option>
+                        <option value="asc">Ascending</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Loading State -->
+            <div class="loading-container" id="loadingContainer">
+                <div class="loading-spinner"></div>
+                <p class="loading-text">FETCHING DATA</p>
+                <p class="loading-subtext" id="loadingStatus">INITIALIZING SYSTEM</p>
+            </div>
+
+            <!-- Table -->
+            <div class="table-container" id="tableContainer" style="display: none;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Wallet Address</th>
+                            <th>Bids</th>
+                            <th>Bid FDV</th>
+                            <th>Last Bid</th>
+                            <th>Shielded</th>
+                            <th>Unshielded</th>
+                            <th>Net Shielded</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <!-- Data will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State -->
+            <div class="empty-state" id="emptyState" style="display: none;">
+                <h3>NO DATA FOUND</h3>
+                <p>No auction participants have been detected yet.</p>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>OFFICIAL ZAMA DASHBOARD // ETHEREUM MAINNET</p>
+            <p class="last-updated">LAST SYNC: <span id="lastUpdated">WAITING...</span></p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
