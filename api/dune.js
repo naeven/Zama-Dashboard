@@ -32,9 +32,27 @@ export default async function handler(req, res) {
         const data = await response.json();
 
         // 5. Add Cache-Control for GET requests (results fetching)
+        // 5. Smart Global Caching logic
         if (req.method === 'GET' && response.status === 200) {
-            // Cache in CDN for 35 minutes (2100 seconds)
-            res.setHeader('Cache-Control', 's-maxage=2100, stale-while-revalidate=60');
+
+            // Default: short cache to allow updates if stale
+            let cacheDuration = 60; // 1 minute
+
+            // Check data freshness
+            if (data.execution_ended_at) {
+                const endedAt = new Date(data.execution_ended_at).getTime();
+                const now = Date.now();
+                const ageSeconds = (now - endedAt) / 1000;
+
+                // If data is "fresh" (younger than 35 mins), cache it for the remaining safe time
+                // This protects credits globally.
+                if (ageSeconds < 2100) {
+                    cacheDuration = 2100; // 35 minutes
+                }
+            }
+
+            // Set the dynamic header
+            res.setHeader('Cache-Control', `s-maxage=${cacheDuration}, stale-while-revalidate=30`);
         }
 
         // 6. Return the response to the frontend
