@@ -110,24 +110,6 @@ async function loadInitialData() {
     }
 }
 
-async function refresh() {
-    if (isLoading) return;
-
-    const confirmMsg = "Manual refresh costs 10 Dune Credits. Proceed?";
-    if (!confirm(confirmMsg)) return;
-
-    try {
-        setLoading(true, 'Refreshing data...');
-        await fetchAuctionInfo();
-        fetchTVS();
-        await executeDuneQuery();
-    } catch (e) {
-        console.error(e);
-        alert('Refresh failed: ' + e.message);
-    } finally {
-        setLoading(false);
-    }
-}
 
 async function refreshInBackground() {
     console.log('Starting background refresh...');
