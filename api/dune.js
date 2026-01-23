@@ -4,7 +4,7 @@ import { Redis } from '@upstash/redis';
 const redis = Redis.fromEnv();
 
 // Cache configuration
-const CACHE_TTL_SECONDS = 1800; // 30 minutes
+const CACHE_TTL_SECONDS = 7200; // 2 hours
 const DUNE_QUERY_ID = '6586283';
 
 export default async function handler(req, res) {
