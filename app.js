@@ -1,29 +1,23 @@
 /**
  * Zama Auction Dashboard
  * Tracks bidders and their net shielded USDT amounts using Dune Analytics
+ * Server-side data architecture - no client-side query execution
  */
 
 // Configuration  
 const ALCHEMY_HTTP_URL = 'https://eth-mainnet.g.alchemy.com/v2/wd-9XAJoEnMc8NWQXwT3Z';
-const DUNE_QUERY_ID = '6574674';
-
-// Optimization Logic
-const DUNE_CREDITS_REMAINING = 1600;
-const COST_PER_QUERY = 10;
-const SAFETY_FACTOR = 0.85; // 15% safety factor (uses 85% of credits)
-const MIN_REFRESH_INTERVAL = 300000; // Min 5 mins
-const FALLBACK_INTERVAL = 3600000; // 1 hour if calculation fails
+const REFRESH_INTERVAL = 1800000; // 30 minutes - matches server cache TTL
 
 // State
 let bidders = new Map();
 let auctionConfig = null;
 let auctionState = null;
 let isLoading = true;
+let refreshTimeoutId = null;
 
 // DOM Elements
 const elements = {
     connectionStatus: document.getElementById('connectionStatus'),
-    refreshBtn: document.getElementById('refreshBtn'),
     totalBidders: document.getElementById('totalBidders'),
     totalBids: document.getElementById('totalBids'),
     totalShielded: document.getElementById('totalShielded'),
@@ -65,171 +59,99 @@ function setupEventListeners() {
     elements.sortOrder.addEventListener('change', renderTable);
 }
 
-// --- Data Fetching ---
+// --- Data Fetching (Server-Only) ---
 
 async function loadInitialData() {
     try {
-        setLoading(true, 'Initial loading...');
+        setLoading(true, 'Loading data...');
         await fetchAuctionInfo();
-
-        const safeInterval = getSafeInterval();
-        const now = Date.now();
-
-        // 1. Check Local Persistent Cache First
-        const localCache = JSON.parse(localStorage.getItem('dune_results_cache') || 'null');
-
-        if (localCache && localCache.rows && localCache.timestamp) {
-            const cacheAge = now - localCache.timestamp;
-            console.log(`Local cache found. Age: ${Math.round(cacheAge / 1000)}s | Safe: ${Math.round(safeInterval / 1000)}s`);
-
-            if (cacheAge < safeInterval) {
-                console.log('Using Local Cache - No network requests needed.');
-                updateDataAge(localCache.timestamp);
-                processDuneResults(localCache.rows, false); // false = don't re-save
-                updateConnectionStatus('connected');
-                scheduleNextRefresh();
-                return; // EXIT EARLY - NO NETWORK CALLS
-            }
-        }
-
-        console.log('No fresh local cache, fetching from Dune...');
-        // 2. Fetch latest cached results via Proxy
-        const cachedData = await fetchLatestDuneResults(DUNE_QUERY_ID);
+        await fetchDashboardData();
         updateConnectionStatus('connected');
-
-        const lastExecution = new Date(cachedData.execution_ended_at).getTime();
-        const age = now - lastExecution;
-        updateDataAge(lastExecution);
-
-        const rows = cachedData.result?.rows || [];
-        const hasTimeColumn = rows[0] && (rows[0].last_bid_time !== undefined);
-
-        const lastPaidRefresh = Number(localStorage.getItem('lastPaidRefresh') || 0);
-        const timeSincePaidRefresh = now - lastPaidRefresh;
-
-        if (rows.length > 0 && !hasTimeColumn) {
-            refreshInBackground();
-        } else if (age > safeInterval && timeSincePaidRefresh > safeInterval) {
-            refreshInBackground();
-        } else {
-            scheduleNextRefresh();
-        }
-
     } catch (e) {
-        console.error(e);
-        setLoading(true, `Error loading data, retrying...`);
-        try {
-            await executeDuneQuery();
-            updateConnectionStatus('connected');
-        } catch (err) {
-            setLoading(true, `Error: ${err.message}`);
-            updateConnectionStatus('error');
-        }
+        console.error('Failed to load data:', e);
+        setLoading(true, `Error: ${e.message}`);
+        updateConnectionStatus('error');
     }
 }
 
-
-async function refreshInBackground() {
-    console.log('Starting background refresh check...');
+async function fetchDashboardData() {
     try {
-        await executeDuneQuery();
+        setLoading(true, 'Fetching data from server...');
+
+        // Simple call to server - server handles all caching
+        const response = await fetch('/api/dune');
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Server error');
+        }
+
+        const data = await response.json();
+
+        // Process the rows
+        if (data.rows && data.rows.length > 0) {
+            processDuneResults(data.rows);
+        }
+
+        // Update UI with cache info from server
+        updateCacheInfo(data);
+
+        // Schedule next refresh based on server response
+        scheduleNextRefresh(data.next_refresh_seconds);
+
+        setLoading(false);
+        return data;
+
     } catch (e) {
-        console.warn('Background refresh failed:', e);
+        console.error('Fetch error:', e);
+        throw e;
     }
-    scheduleNextRefresh();
 }
 
-function scheduleNextRefresh() {
-    const interval = getSafeInterval();
-    console.log(`Next Auto-Refresh in: ${Math.round(interval / 60000)}m`);
-    setTimeout(refreshInBackground, interval);
-}
-
-function getSafeInterval() {
-    if (!auctionConfig) return FALLBACK_INTERVAL;
-
-    const now = Date.now();
-    const endTime = auctionConfig.endAuctionTime * 1000;
-    const remainingTime = endTime - now;
-
-    if (remainingTime <= 0) return FALLBACK_INTERVAL;
-
-    const safeCredits = DUNE_CREDITS_REMAINING * SAFETY_FACTOR;
-    const allowedQueries = Math.floor(safeCredits / COST_PER_QUERY);
-
-    if (allowedQueries <= 0) return FALLBACK_INTERVAL;
-
-    let calculatedInterval = Math.floor(remainingTime / allowedQueries);
-
-    // Ensure we don't refresh faster than MIN_REFRESH_INTERVAL
-    // but also not so fast that we burn credits if users refresh page
-    return Math.max(calculatedInterval, MIN_REFRESH_INTERVAL);
-}
-
-// --- Dune Proxy Helpers ---
-
-async function fetchDuneData(endpoint, options = {}) {
-    // Vercel Proxy URL
-    const url = `/api/dune?endpoint=${encodeURIComponent(endpoint)}`;
-    const resp = await fetch(url, options);
-
-    if (!resp.ok) {
-        const err = await resp.json();
-        throw new Error(err.error || 'Dune Proxy Error');
-    }
-    return await resp.json();
-}
-
-async function fetchLatestDuneResults(queryId) {
-    const data = await fetchDuneData(`query/${queryId}/results`);
-    if (data.result && data.result.rows) {
-        processDuneResults(data.result.rows);
-    }
-    return data;
-}
-
-async function executeDuneQuery() {
-    // Check local rate limit again before spending money
-    const now = Date.now();
-    const safeInterval = getSafeInterval();
-    const lastPaidRefresh = Number(localStorage.getItem('lastPaidRefresh') || 0);
-
-    if (now - lastPaidRefresh < safeInterval) {
-        console.warn('Paid refresh blocked by local rate limit.');
-        return;
+function scheduleNextRefresh(nextRefreshSeconds) {
+    // Clear any existing timeout
+    if (refreshTimeoutId) {
+        clearTimeout(refreshTimeoutId);
     }
 
-    // Record this attempt and update UI ONLY if we actually proceed
-    localStorage.setItem('lastPaidRefresh', now.toString());
-    elements.lastUpdated.textContent = 'Updating...';
+    // Use server-provided interval or default 30 minutes
+    const intervalMs = (nextRefreshSeconds || 1800) * 1000;
 
-    // Use GET (handled by proxy as POST) so we can cache the Execution ID globally for 60s
-    // This prevents "Thundering Herd" where 100 users trigger 100 credits.
-    const executeData = await fetchDuneData(`query/${DUNE_QUERY_ID}/execute`);
-    const executionId = executeData.execution_id;
+    console.log(`Next refresh scheduled in: ${Math.round(intervalMs / 60000)} minutes`);
 
-    let attempts = 0;
-    while (attempts < 60) {
-        attempts++;
-        if (bidders.size === 0) {
-            setLoading(true, `Waiting for Dune results... (${attempts * 2}s)`);
-        } else {
-            elements.lastUpdated.textContent = `Updating... (${attempts * 2}s)`;
+    refreshTimeoutId = setTimeout(async () => {
+        console.log('Auto-refresh triggered');
+        try {
+            await fetchDashboardData();
+            updateConnectionStatus('connected');
+        } catch (e) {
+            console.warn('Auto-refresh failed:', e);
+            updateConnectionStatus('error');
+            // Retry in 5 minutes on error
+            scheduleNextRefresh(300);
         }
+    }, intervalMs);
+}
 
-        await new Promise(r => setTimeout(r, 2000));
+function updateCacheInfo(data) {
+    if (!data) return;
 
-        const statusData = await fetchDuneData(`execution/${executionId}/results`);
-
-        if (statusData.state === 'QUERY_STATE_COMPLETED') {
-            processDuneResults(statusData.result.rows);
-            setLoading(false);
-            return;
-        } else if (statusData.state === 'QUERY_STATE_FAILED') {
-            throw new Error(`Dune Query Failed: ${statusData.error || 'Unknown error'}`);
-        }
+    // Show when data was cached
+    if (data.cached_at) {
+        updateDataAge(data.cached_at);
     }
-    throw new Error('Dune query timed out');
+
+    // Update last updated time
+    updateLastUpdated();
+
+    // Log source for debugging
+    if (data.source) {
+        console.log(`Data source: ${data.source}`);
+    }
+
+    if (data.warning) {
+        console.warn(`Server warning: ${data.warning}`);
+    }
 }
 
 function processDuneResults(rows) {
@@ -250,7 +172,6 @@ function processDuneResults(rows) {
     updateStats();
     renderBidDistribution();
     renderTable();
-    updateLastUpdated();
     setLoading(false);
 }
 
