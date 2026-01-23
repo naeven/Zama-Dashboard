@@ -335,17 +335,19 @@ function updateAuctionInfo() {
 
 function updateStats() {
     const list = Array.from(bidders.values());
-    elements.totalBidders.textContent = formatNumber(list.length);
+    elements.totalBidders.textContent = formatNumber(list.filter(b => b.bidCount > 0).length);
     elements.totalBids.textContent = formatNumber(list.reduce((s, b) => s + b.bidCount, 0));
     // Sum of net shielded (wrapped - unwrapped) for all auction participants
-    const totalAuctionShielded = list.reduce((sum, b) => sum + (b.wrapped - b.unwrapped), 0n);
+    const totalAuctionShielded = list
+        .filter(b => b.bidCount > 0)
+        .reduce((sum, b) => sum + (b.wrapped - b.unwrapped), 0n);
     elements.auctionShielded.textContent = formatUSDT(totalAuctionShielded);
 }
 
 function renderTable() {
     // --- Stats View Logic ---
     if (isStatsView) {
-        elements.statsHeader.style.display = 'flex';
+        elements.statsHeader.style.display = 'none'; // Hidden per user request
         // Hide standard controls visualization if needed, or just let them be.
         // For stats view, we override the table content entirely.
 
