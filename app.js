@@ -13,7 +13,9 @@ let bidders = new Map();
 let auctionConfig = null;
 let auctionState = null;
 let isLoading = true;
+
 let refreshTimeoutId = null;
+let isStatsView = false;
 
 // DOM Elements
 const elements = {
@@ -37,7 +39,12 @@ const elements = {
     lastUpdated: document.getElementById('lastUpdated'),
     dataAge: document.getElementById('dataAge'),
     chartSection: document.querySelector('.chart-section'),
-    chartLegend: document.getElementById('chartLegend')
+    chartSection: document.querySelector('.chart-section'),
+    chartLegend: document.getElementById('chartLegend'),
+    statsToggle: document.getElementById('statsToggle'),
+    statsHeader: document.getElementById('statsHeader'),
+    avgBidFdvTop50: document.getElementById('avgBidFdvTop50'),
+    tableHead: document.getElementById('tableHead')
 };
 
 // Pagination State
@@ -57,7 +64,12 @@ async function init() {
 function setupEventListeners() {
     elements.searchInput.addEventListener('input', debounce(renderTable, 300));
     elements.sortBy.addEventListener('change', renderTable);
+    elements.sortBy.addEventListener('change', renderTable);
     elements.sortOrder.addEventListener('change', renderTable);
+    elements.statsToggle.addEventListener('change', (e) => {
+        isStatsView = e.target.checked;
+        renderTable();
+    });
 }
 
 // --- Data Fetching (Server-Only) ---
@@ -271,6 +283,95 @@ function updateStats() {
 }
 
 function renderTable() {
+    // --- Stats View Logic ---
+    if (isStatsView) {
+        elements.statsHeader.style.display = 'flex';
+        // Hide standard controls visualization if needed, or just let them be.
+        // For stats view, we override the table content entirely.
+
+        // 1. Calculate Stats Block: Top 50 wallets (who have placed bids) by Net Shielded
+        // Filter for bids > 0 first to get "avg bid fdv for top 50 wallets which have place their bids"
+        // Actually, user said: "small block which should be above of this table showing average bid fdv for top 50 wallets which have place their bids"
+        // And table is "top 20 wallets by net shielded usdt... if they have placed the bid or not"
+
+        // Let's prepare data for Table: Top 20 by Net Shielded (All walelts)
+        let allData = Array.from(bidders.values());
+        allData = allData.map(b => ({ ...b, netShielded: b.wrapped - b.unwrapped }));
+        allData.sort((a, b) => {
+            const valA = a.netShielded;
+            const valB = b.netShielded;
+            return valA > valB ? -1 : valA < valB ? 1 : 0; // Always descending by Net Shielded
+        });
+
+        const top20 = allData.slice(0, 20);
+
+        // Update Header
+        elements.tableHead.innerHTML = `
+            <tr>
+                <th>Wallet Address</th>
+                <th>Net Shielded</th>
+                <th>Status</th>
+                <th>Max FDV</th>
+                <th>Avg FDV</th>
+            </tr>
+        `;
+
+        // Render Body
+        elements.tableBody.innerHTML = top20.map(b => {
+            const hasBid = b.bidCount > 0;
+            return `
+            <tr>
+                <td class="wallet-address"><a href="https://etherscan.io/address/${b.address}" target="_blank">${truncateAddress(b.address)}</a></td>
+                <td class="amount net-shielded">${formatUSDT(b.netShielded)}</td>
+                <td class="status-cell">
+                    <span class="status-badge ${hasBid ? 'active' : 'pending'}" style="font-size: 0.7rem; padding: 4px 8px;">
+                        ${hasBid ? 'PLACED BID' : 'NO BID'}
+                    </span>
+                </td>
+                <td class="amount fdv">${hasBid ? '$' + b.latestBidFdv.toFixed(4) : '-'}</td>
+                <td class="amount fdv">${hasBid ? '$' + b.avgBidFdv.toFixed(4) : '-'}</td>
+            </tr>
+            `;
+        }).join('');
+
+        // Stats Block Calculation:
+        // "average bid fdv for top 50 wallets which have place their bids"
+        // I assume this means: Take top 50 by Net Shielded AMONG those who have bids.
+        const top50WithBids = allData.filter(b => b.bidCount > 0).slice(0, 50);
+        let avgVal = 0;
+        if (top50WithBids.length > 0) {
+            const sumFdv = top50WithBids.reduce((s, b) => s + b.avgBidFdv, 0);
+            avgVal = sumFdv / top50WithBids.length;
+        }
+        elements.avgBidFdvTop50.textContent = '$' + avgVal.toFixed(4);
+
+        elements.tableContainer.style.display = 'block';
+        elements.emptyState.style.display = 'none';
+
+        // Hide pagination in this view as it's a fixed top 20 list
+        if (paginationContainer) paginationContainer.style.display = 'none';
+
+        return;
+    }
+
+    // --- Standard View Logic ---
+    elements.statsHeader.style.display = 'none';
+
+    // Restore Standard Header
+    elements.tableHead.innerHTML = `
+        <tr>
+            <th>Wallet Address</th>
+            <th>Bids</th>
+            <th>Bid FDV</th>
+            <th>Avg Bid</th>
+            <th>Last Bid</th>
+            <th>Shielded</th>
+            <th>Unshielded</th>
+            <th>Net Shielded</th>
+            <th>Actions</th>
+        </tr>
+    `;
+
     const search = elements.searchInput.value.toLowerCase();
     const sortBy = elements.sortBy.value;
     const sortOrder = elements.sortOrder.value;

@@ -105,6 +105,14 @@
                     </svg>
                     <input type="text" id="searchInput" placeholder="Search by address...">
                 </div>
+                <!-- New Stats Toggle -->
+                <div class="stats-toggle-container">
+                    <span class="toggle-label">MORE STATISTICS</span>
+                    <label class="switch">
+                        <input type="checkbox" id="statsToggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
                 <div class="filter-options">
                     <select id="sortBy">
                         <option value="netShielded">Sort by Net Shielded</option>
@@ -121,6 +129,14 @@
                 </div>
             </div>
 
+            <!-- Stats View Header (Hidden by default) -->
+            <div id="statsHeader" class="stats-header" style="display: none;">
+                <div class="stats-summary-block">
+                    <span class="summary-label">AVERAGE BID FDV (TOP 50 NET SHIELDED)</span>
+                    <span class="summary-value" id="avgBidFdvTop50">-</span>
+                </div>
+            </div>
+
             <!-- Loading State -->
             <div class="loading-container" id="loadingContainer">
                 <div class="loading-spinner"></div>
@@ -131,23 +147,24 @@
             <!-- Table -->
             <div class="table-container" id="tableContainer" style="display: none;">
                 <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Wallet Address</th>
-                            <th>Bids</th>
-                            <th>Bid FDV</th>
-                            <th>Avg Bid</th>
-                            <th>Last Bid</th>
-                            <th>Shielded</th>
-                            <th>Unshielded</th>
-                            <th>Net Shielded</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody">
-                        <!-- Data will be populated here -->
-                    </tbody>
-                </table>
+                    <table class="data-table">
+                        <thead id="tableHead">
+                            <tr>
+                                <th>Wallet Address</th>
+                                <th>Bids</th>
+                                <th>Bid FDV</th>
+                                <th>Avg Bid</th>
+                                <th>Last Bid</th>
+                                <th>Shielded</th>
+                                <th>Unshielded</th>
+                                <th>Net Shielded</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- Data will be populated here -->
+                        </tbody>
+                    </table>
             </div>
 
             <!-- Empty State -->
