@@ -22,7 +22,6 @@ const elements = {
     totalBids: document.getElementById('totalBids'),
     totalShielded: document.getElementById('totalShielded'),
     auctionShielded: document.getElementById('auctionShielded'),
-    avgBidFdv: document.getElementById('avgBidFdv'),
     auctionStart: document.getElementById('auctionStart'),
     auctionEnd: document.getElementById('auctionEnd'),
     tokenSupply: document.getElementById('tokenSupply'),
@@ -167,6 +166,7 @@ function processDuneResults(rows) {
             wrapped: BigInt(Math.floor(parseFloat(row.total_wrapped || 0) * 1e6)),
             unwrapped: BigInt(Math.floor(parseFloat(row.total_unwrapped || 0) * 1e6)),
             latestBidFdv: parseFloat(row.latest_bid_fdv || 0),
+            avgBidFdv: parseFloat(row.avg_bid_fdv || 0),
             lastBidTime: row.last_bid_time ? new Date(row.last_bid_time.replace(' UTC', 'Z').replace(' ', 'T')).getTime() : 0
         });
     }
@@ -268,11 +268,6 @@ function updateStats() {
     // Sum of net shielded (wrapped - unwrapped) for all auction participants
     const totalAuctionShielded = list.reduce((sum, b) => sum + (b.wrapped - b.unwrapped), 0n);
     elements.auctionShielded.textContent = formatUSDT(totalAuctionShielded);
-    // Calculate average bid FDV
-    const totalBidCount = list.reduce((s, b) => s + b.bidCount, 0);
-    const sumBidFdv = list.reduce((sum, b) => sum + (b.latestBidFdv * b.bidCount), 0);
-    const avgBid = totalBidCount > 0 ? sumBidFdv / totalBidCount : 0;
-    elements.avgBidFdv.textContent = '$' + avgBid.toFixed(4);
 }
 
 function renderTable() {
@@ -317,6 +312,7 @@ function renderTable() {
             <td class="wallet-address"><a href="https://etherscan.io/address/${b.address}" target="_blank">${truncateAddress(b.address)}</a></td>
             <td><span class="bid-count">${b.bidCount}</span></td>
             <td class="amount fdv">$${b.latestBidFdv.toFixed(4)}</td>
+            <td class="amount fdv">$${b.avgBidFdv.toFixed(4)}</td>
             <td class="amount time">${formatRelativeTime(b.lastBidTime)}</td>
             <td class="amount">${formatUSDT(b.wrapped)}</td>
             <td class="amount ${b.unwrapped > 0n ? 'unshielded' : 'neutral'}">${formatUSDT(b.unwrapped)}</td>
@@ -324,7 +320,6 @@ function renderTable() {
             <td><a class="action-btn" href="https://etherscan.io/address/${b.address}" target="_blank">VIEW</a></td>
         </tr>
     `).join('');
-
     updatePagination(totalPages);
 }
 
