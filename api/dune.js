@@ -41,63 +41,95 @@ export default async function handler(req, res) {
             }
         }
 
-        // 2. Cache is stale or empty - fetch from Dune's cached results (FREE, no credits)
+        // 2. Cache is stale or empty - Check for LOCK to prevent race conditions
+        const LOCK_KEY = `dune:lock:${DUNE_QUERY_ID}`;
+        const isLocked = await redis.get(LOCK_KEY);
+
+        if (isLocked) {
+            console.log('Fetch already in progress (Locked). Waiting...');
+            // Wait for up to 5 seconds for the other process to finish
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Check cache again after waiting
+            const refetchedCache = await redis.get(CACHE_KEY);
+            if (refetchedCache) {
+                return res.status(200).json({
+                    rows: refetchedCache.rows,
+                    cached_at: refetchedCache.cached_at,
+                    source: 'cache_after_lock_wait'
+                });
+            }
+            // If still no cache after wait, return 429 to avoid hammering API
+            return res.status(429).json({ error: 'System busy, please try again in a moment.' });
+        }
+
+        // Set Lock (expire in 20s in case of crash)
+        await redis.set(LOCK_KEY, 'locked', { ex: 20 });
+
         console.log('Cache stale/empty. Fetching from Dune cached results...');
 
-        const duneUrl = `https://api.dune.com/api/v1/query/${DUNE_QUERY_ID}/results`;
-        const response = await fetch(duneUrl, {
-            method: 'GET',
-            headers: {
-                'X-Dune-Api-Key': DUNE_API_KEY,
-                'Content-Type': 'application/json'
-            }
-        });
+        try {
+            const duneUrl = `https://api.dune.com/api/v1/query/${DUNE_QUERY_ID}/results`;
+            const response = await fetch(duneUrl, {
+                method: 'GET',
+                headers: {
+                    'X-Dune-Api-Key': DUNE_API_KEY,
+                    'Content-Type': 'application/json'
+                }
+            });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Dune API Error:', errorData);
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('Dune API Error:', errorData);
 
-            // If Dune fails but we have stale cache, return it
-            if (cached && cached.rows) {
-                const cacheAgeSeconds = Math.floor((now - cached.cached_at) / 1000);
-                return res.status(200).json({
-                    rows: cached.rows,
-                    cached_at: cached.cached_at,
-                    cache_age_seconds: cacheAgeSeconds,
-                    next_refresh_seconds: 0,
-                    source: 'stale_cache',
-                    warning: 'Using stale cache due to Dune API error'
+                // If Dune fails but we have stale cache, return it
+                if (cached && cached.rows) {
+                    const cacheAgeSeconds = Math.floor((now - cached.cached_at) / 1000);
+                    return res.status(200).json({
+                        rows: cached.rows,
+                        cached_at: cached.cached_at,
+                        cache_age_seconds: cacheAgeSeconds,
+                        next_refresh_seconds: 0,
+                        source: 'stale_cache',
+                        warning: 'Using stale cache due to Dune API error'
+                    });
+                }
+
+                return res.status(response.status).json({
+                    error: 'Dune API error',
+                    details: errorData
                 });
             }
 
-            return res.status(response.status).json({
-                error: 'Dune API error',
-                details: errorData
+            const data = await response.json();
+            const rows = data.result?.rows || [];
+            const executionEndedAt = data.execution_ended_at;
+
+            // 3. Update Redis Cache
+            const cacheData = {
+                rows: rows,
+                cached_at: now,
+                execution_ended_at: executionEndedAt
+            };
+
+            await redis.set(CACHE_KEY, cacheData);
+            console.log(`Updated Redis cache with ${rows.length} rows`);
+
+            // Release Lock
+            await redis.del(LOCK_KEY);
+
+            // 4. Return fresh data
+            return res.status(200).json({
+                rows: rows,
+                cached_at: now,
+                cache_age_seconds: 0,
+                next_refresh_seconds: CACHE_TTL_SECONDS,
+                source: 'dune_fresh'
             });
+        } catch (fetchError) {
+            // Ensure lock is released even if fetch fails
+            await redis.del(LOCK_KEY);
+            throw fetchError;
         }
-
-        const data = await response.json();
-        const rows = data.result?.rows || [];
-        const executionEndedAt = data.execution_ended_at;
-
-        // 3. Update Redis Cache
-        const cacheData = {
-            rows: rows,
-            cached_at: now,
-            execution_ended_at: executionEndedAt
-        };
-
-        await redis.set(CACHE_KEY, cacheData);
-        console.log(`Updated Redis cache with ${rows.length} rows`);
-
-        // 4. Return fresh data
-        return res.status(200).json({
-            rows: rows,
-            cached_at: now,
-            cache_age_seconds: 0,
-            next_refresh_seconds: CACHE_TTL_SECONDS,
-            source: 'dune_fresh'
-        });
 
     } catch (error) {
         console.error('Handler Error:', error);
