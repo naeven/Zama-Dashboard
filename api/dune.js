@@ -21,16 +21,18 @@ export default async function handler(req, res) {
 
     try {
         // 1. Check Redis Cache First
+        const { force } = req.query;
         const cached = await redis.get(CACHE_KEY);
         const now = Date.now();
 
-        if (cached && cached.cached_at) {
+        if (cached && cached.cached_at && !force) {
             const cacheAgeSeconds = Math.floor((now - cached.cached_at) / 1000);
+            console.log(`Cache Check: Age=${cacheAgeSeconds}s, TTL=${CACHE_TTL_SECONDS}s`);
 
             // If cache is fresh (< 30 min), return it immediately
             if (cacheAgeSeconds < CACHE_TTL_SECONDS) {
                 const nextRefreshSeconds = CACHE_TTL_SECONDS - cacheAgeSeconds;
-                console.log(`Serving from Redis Cache. Age: ${cacheAgeSeconds}s, Next refresh in: ${nextRefreshSeconds}s`);
+                console.log(`Serving from Redis Cache. Next refresh in: ${nextRefreshSeconds}s`);
 
                 return res.status(200).json({
                     rows: cached.rows,
@@ -40,6 +42,9 @@ export default async function handler(req, res) {
                     source: 'cache'
                 });
             }
+            console.log('Cache Expired. Proceeding to refresh...');
+        } else if (force) {
+            console.log('Force Refresh requested. Bypassing cache...');
         }
 
         // 2. Cache is stale or empty - Check for LOCK to prevent race conditions
