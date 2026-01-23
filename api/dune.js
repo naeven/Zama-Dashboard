@@ -17,6 +17,7 @@ export default async function handler(req, res) {
     }
 
     const CACHE_KEY = `dune:dashboard:${DUNE_QUERY_ID}`;
+    const LOCK_KEY = `dune:lock:${DUNE_QUERY_ID}`;
 
     try {
         // 1. Check Redis Cache First
@@ -42,12 +43,11 @@ export default async function handler(req, res) {
         }
 
         // 2. Cache is stale or empty - Check for LOCK to prevent race conditions
-        const LOCK_KEY = `dune:lock:${DUNE_QUERY_ID}`;
         const isLocked = await redis.get(LOCK_KEY);
 
         if (isLocked) {
             console.log('Fetch already in progress (Locked). Waiting...');
-            // Wait for up to 5 seconds for the other process to finish
+            // Wait for up to 2 seconds for the other process to finish
             await new Promise(resolve => setTimeout(resolve, 2000));
             // Check cache again after waiting
             const refetchedCache = await redis.get(CACHE_KEY);
@@ -62,53 +62,71 @@ export default async function handler(req, res) {
             return res.status(429).json({ error: 'System busy, please try again in a moment.' });
         }
 
-        // Set Lock (expire in 20s in case of crash)
-        await redis.set(LOCK_KEY, 'locked', { ex: 20 });
+        // Set Lock (expire in 60s as execution takes time)
+        await redis.set(LOCK_KEY, 'locked', { ex: 60 });
 
-        console.log('Cache stale/empty. Fetching from Dune cached results...');
+        console.log('Cache stale/empty. Triggering new Dune execution...');
 
         try {
-            const duneUrl = `https://api.dune.com/api/v1/query/${DUNE_QUERY_ID}/results`;
-            const response = await fetch(duneUrl, {
-                method: 'GET',
-                headers: {
-                    'X-Dune-Api-Key': DUNE_API_KEY,
-                    'Content-Type': 'application/json'
-                }
+            // Step A: Trigger Execution
+            const executeUrl = `https://api.dune.com/api/v1/query/${DUNE_QUERY_ID}/execute`;
+            const execResp = await fetch(executeUrl, {
+                method: 'POST',
+                headers: { 'X-Dune-Api-Key': DUNE_API_KEY, 'Content-Type': 'application/json' }
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                console.error('Dune API Error:', errorData);
-
-                // If Dune fails but we have stale cache, return it
+            if (!execResp.ok) {
+                const err = await execResp.json();
+                console.error('Dune Execute Failed:', err);
+                // If execution fails, try fallback to stale cache
                 if (cached && cached.rows) {
-                    const cacheAgeSeconds = Math.floor((now - cached.cached_at) / 1000);
-                    return res.status(200).json({
-                        rows: cached.rows,
-                        cached_at: cached.cached_at,
-                        cache_age_seconds: cacheAgeSeconds,
-                        next_refresh_seconds: 0,
-                        source: 'stale_cache',
-                        warning: 'Using stale cache due to Dune API error'
-                    });
+                    await redis.del(LOCK_KEY);
+                    return res.status(200).json({ rows: cached.rows, cached_at: cached.cached_at, source: 'stale_on_fail' });
                 }
-
-                return res.status(response.status).json({
-                    error: 'Dune API error',
-                    details: errorData
-                });
+                throw new Error(`Dune Execute failed: ${JSON.stringify(err)}`);
             }
 
-            const data = await response.json();
-            const rows = data.result?.rows || [];
-            const executionEndedAt = data.execution_ended_at;
+            const { execution_id } = await execResp.json();
+            console.log(`Execution Triggered: ${execution_id}. Polling...`);
+
+            // Step B: Poll for Results
+            let attempts = 0;
+            let finalData = null;
+
+            while (attempts < 15) { // Poll for max ~30 seconds
+                await new Promise(r => setTimeout(r, 2000)); // Wait 2s
+                const statusUrl = `https://api.dune.com/api/v1/execution/${execution_id}/results`;
+                const statusResp = await fetch(statusUrl, {
+                    headers: { 'X-Dune-Api-Key': DUNE_API_KEY }
+                });
+
+                if (statusResp.status === 200) {
+                    finalData = await statusResp.json();
+                    if (finalData.state === 'QUERY_STATE_COMPLETED') {
+                        break; // Success!
+                    }
+                    if (finalData.state === 'QUERY_STATE_FAILED' || finalData.state === 'QUERY_STATE_CANCELLED') {
+                        throw new Error(`Query failed state: ${finalData.state}`);
+                    }
+                }
+                attempts++;
+            }
+
+            if (!finalData || finalData.state !== 'QUERY_STATE_COMPLETED') {
+                // Timeout or failure
+                console.error('Dune execution timed out or failed');
+                await redis.del(LOCK_KEY);
+                if (cached) return res.status(200).json({ rows: cached.rows, source: 'stale_on_timeout' });
+                return res.status(504).json({ error: 'Dune query execution timed out' });
+            }
+
+            const rows = finalData.result?.rows || [];
 
             // 3. Update Redis Cache
             const cacheData = {
                 rows: rows,
                 cached_at: now,
-                execution_ended_at: executionEndedAt
+                execution_ended_at: finalData.execution_ended_at
             };
 
             await redis.set(CACHE_KEY, cacheData);
@@ -123,11 +141,17 @@ export default async function handler(req, res) {
                 cached_at: now,
                 cache_age_seconds: 0,
                 next_refresh_seconds: CACHE_TTL_SECONDS,
-                source: 'dune_fresh'
+                source: 'dune_fresh_execution'
             });
+
         } catch (fetchError) {
             // Ensure lock is released even if fetch fails
+            console.error(fetchError);
             await redis.del(LOCK_KEY);
+            // Fallback to stale if available on crash
+            if (cached && cached.rows) {
+                return res.status(200).json({ rows: cached.rows, cached_at: cached.cached_at, source: 'stale_on_crash' });
+            }
             throw fetchError;
         }
 
