@@ -348,11 +348,20 @@ function renderBidDistribution() {
     const buckets = { '$0.005 - $0.01': 0, '$0.01 - $0.025': 0, '$0.025 - $0.05': 0, '$0.05 - $0.10': 0, '$0.10 - $0.25': 0, '$0.25 - $0.50': 0, '$0.50 - $1.00': 0, '$1.00+': 0 };
     list.forEach(b => {
         const p = b.latestBidFdv;
-        if (p >= 1.00) buckets['$1.00+']++; else if (p >= 0.50) buckets['$0.50 - $1.00']++; else if (p >= 0.25) buckets['$0.25 - $0.50']++; else if (p >= 0.10) buckets['$0.10 - $0.25']++; else if (p >= 0.05) buckets['$0.05 - $0.10']++; else if (p >= 0.025) buckets['$0.025 - $0.05']++; else if (p >= 0.01) buckets['$0.01 - $0.025']++; else if (p >= 0.005) buckets['$0.005 - $0.01']++;
+        // Count TOTAL BIDS, not just unique wallets
+        const count = b.bidCount;
+        if (p >= 1.00) buckets['$1.00+'] += count;
+        else if (p >= 0.50) buckets['$0.50 - $1.00'] += count;
+        else if (p >= 0.25) buckets['$0.25 - $0.50'] += count;
+        else if (p >= 0.10) buckets['$0.10 - $0.25'] += count;
+        else if (p >= 0.05) buckets['$0.05 - $0.10'] += count;
+        else if (p >= 0.025) buckets['$0.025 - $0.05'] += count;
+        else if (p >= 0.01) buckets['$0.01 - $0.025'] += count;
+        else if (p >= 0.005) buckets['$0.005 - $0.01'] += count;
     });
 
     const colors = ['#FFE600', '#E6CF00', '#00FF94', '#00E685', '#FFFFFF', '#E0E0E0', '#888888', '#333333'];
-    elements.chartLegend.innerHTML = '<div style="color:#888888;font-family:JetBrains Mono;font-size:12px;font-weight:bold;margin-bottom:12px;">BID DISTRIBUTION // PRICE ($)</div>';
+    elements.chartLegend.innerHTML = '<div style="color:#888888;font-family:JetBrains Mono;font-size:12px;font-weight:bold;margin-bottom:12px;">BID COUNT DISTRIBUTION // BY FDV PRICE ($)</div>';
     const grid = document.createElement('div'); grid.className = 'distribution-grid';
     Object.entries(buckets).forEach(([key, val], i) => {
         if (val > 0) {
