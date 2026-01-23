@@ -21,6 +21,7 @@ const elements = {
     totalBidders: document.getElementById('totalBidders'),
     totalBids: document.getElementById('totalBids'),
     totalShielded: document.getElementById('totalShielded'),
+    auctionShielded: document.getElementById('auctionShielded'),
     auctionStart: document.getElementById('auctionStart'),
     auctionEnd: document.getElementById('auctionEnd'),
     tokenSupply: document.getElementById('tokenSupply'),
@@ -263,6 +264,9 @@ function updateStats() {
     const list = Array.from(bidders.values());
     elements.totalBidders.textContent = formatNumber(list.length);
     elements.totalBids.textContent = formatNumber(list.reduce((s, b) => s + b.bidCount, 0));
+    // Sum of net shielded (wrapped - unwrapped) for all auction participants
+    const totalAuctionShielded = list.reduce((sum, b) => sum + (b.wrapped - b.unwrapped), 0n);
+    elements.auctionShielded.textContent = formatUSDT(totalAuctionShielded);
 }
 
 function renderTable() {
