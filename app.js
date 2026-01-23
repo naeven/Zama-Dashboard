@@ -524,19 +524,30 @@ function renderBidDistribution() {
     if (list.length === 0) { elements.chartSection.style.display = 'none'; return; }
     elements.chartSection.style.display = 'flex';
 
-    const buckets = { '$0.005 - $0.01': 0, '$0.01 - $0.025': 0, '$0.025 - $0.05': 0, '$0.05 - $0.10': 0, '$0.10 - $0.25': 0, '$0.25 - $0.50': 0, '$0.50 - $1.00': 0, '$1.00+': 0 };
+    const buckets = {
+        '< $0.01': 0,
+        '$0.01 - $0.02': 0,
+        '$0.02 - $0.03': 0,
+        '$0.03 - $0.04': 0,
+        '$0.04 - $0.05': 0,
+        '$0.05 - $0.10': 0,
+        '$0.10+': 0
+    };
+
     list.forEach(b => {
+        // Only count active bidders
+        if (b.bidCount === 0) return;
+
         const p = b.latestBidFdv;
-        // Count TOTAL BIDS, not just unique wallets
         const count = b.bidCount;
-        if (p >= 1.00) buckets['$1.00+'] += count;
-        else if (p >= 0.50) buckets['$0.50 - $1.00'] += count;
-        else if (p >= 0.25) buckets['$0.25 - $0.50'] += count;
-        else if (p >= 0.10) buckets['$0.10 - $0.25'] += count;
+
+        if (p >= 0.10) buckets['$0.10+'] += count;
         else if (p >= 0.05) buckets['$0.05 - $0.10'] += count;
-        else if (p >= 0.025) buckets['$0.025 - $0.05'] += count;
-        else if (p >= 0.01) buckets['$0.01 - $0.025'] += count;
-        else if (p >= 0.005) buckets['$0.005 - $0.01'] += count;
+        else if (p >= 0.04) buckets['$0.04 - $0.05'] += count;
+        else if (p >= 0.03) buckets['$0.03 - $0.04'] += count;
+        else if (p >= 0.02) buckets['$0.02 - $0.03'] += count;
+        else if (p >= 0.01) buckets['$0.01 - $0.02'] += count;
+        else buckets['< $0.01'] += count;
     });
 
     const colors = ['#FFE600', '#E6CF00', '#00FF94', '#00E685', '#FFFFFF', '#E0E0E0', '#888888', '#333333'];
