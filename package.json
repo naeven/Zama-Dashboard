@@ -10,6 +10,7 @@
   "author": "Naeven",
   "license": "ISC",
   "dependencies": {
-    "@upstash/redis": "^1.28.0"
+    "@upstash/redis": "^1.28.0",
+    "ethers": "^6.16.0"
   }
 }

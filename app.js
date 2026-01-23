@@ -194,7 +194,8 @@ function processDuneResults(rows) {
 const CONTRACTS = {
     AUCTION: '0x04a5b8C32f9c38092B008A4939f1F91D550C4345',
     CUSDT_PROXY: '0xAe0207C757Aa2B4019AD96edD0092ddc63EF0c50',
-    USDT: '0xdAC17F958D2ee523a2206206994597C13D831ec7'
+    USDT: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+    ZAMA_OG_NFT: '0xb3F2dDaEd136Cf10d5b228EE2EfF29B71C7535Fc'
 };
 
 async function rpcCall(method, params) {
@@ -229,6 +230,65 @@ async function fetchTVS() {
         const data = await rpcCall('eth_call', [{ to: CONTRACTS.USDT, data: '0x70a08231' + CONTRACTS.CUSDT_PROXY.slice(2).padStart(64, '0') }, 'latest']);
         elements.totalShielded.textContent = formatUSDT(BigInt(data));
     } catch (e) { console.warn('TVS fetch failed:', e); }
+}
+
+async function fetchNFTBalances(addresses) {
+    // Filter out addresses we've already checked to fail-safe against loops
+    const toCheck = addresses.filter(addr => {
+        const b = bidders.get(addr.toLowerCase());
+        return b && b.nftBalance === undefined;
+    });
+
+    if (toCheck.length === 0) return;
+
+    // Mark as fetching to prevent parallel calls
+    toCheck.forEach(addr => {
+        const b = bidders.get(addr.toLowerCase());
+        if (b) b.nftBalance = 'fetching';
+    });
+
+    try {
+        // Construct batch request
+        const batch = toCheck.map((addr, i) => ({
+            jsonrpc: '2.0',
+            id: i,
+            method: 'eth_call',
+            params: [{
+                to: CONTRACTS.ZAMA_OG_NFT,
+                data: '0x70a08231' + addr.slice(2).padStart(64, '0') // balanceOf(address)
+            }, 'latest']
+        }));
+
+        const response = await fetch(ALCHEMY_HTTP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(batch)
+        });
+
+        const results = await response.json();
+
+        // Process results
+        results.forEach((res, i) => {
+            const addr = toCheck[i];
+            const b = bidders.get(addr.toLowerCase());
+            if (b && !res.error) {
+                b.nftBalance = parseInt(res.result, 16);
+            } else if (b) {
+                b.nftBalance = 0; // Default to 0 on error
+            }
+        });
+
+        // Re-render table to show new data
+        if (isStatsView) renderTable();
+
+    } catch (e) {
+        console.warn('NFT batch fetch failed:', e);
+        // Reset so we can retry? Or just leave as fetching/error?
+        toCheck.forEach(addr => {
+            const b = bidders.get(addr.toLowerCase());
+            if (b) b.nftBalance = null; // null triggers retry next render
+        });
+    }
 }
 
 // --- UI Logic ---
@@ -313,12 +373,27 @@ function renderTable() {
                 <th>Status</th>
                 <th>Max FDV</th>
                 <th>Avg FDV</th>
+                <th>OG NFT</th>
             </tr>
         `;
+
+        // Check/Fetch NFTs
+        const missingNftData = top20.filter(b => b.nftBalance === undefined).map(b => b.address);
+        if (missingNftData.length > 0) {
+            // Trigger fetch in background
+            fetchNFTBalances(missingNftData);
+        }
 
         // Render Body
         elements.tableBody.innerHTML = top20.map(b => {
             const hasBid = b.bidCount > 0;
+            let nftDisplay = '<span style="color: grey">...</span>';
+            if (b.nftBalance !== undefined && b.nftBalance !== 'fetching') {
+                nftDisplay = b.nftBalance > 0
+                    ? `<span style="color: #00FF94; font-weight: bold;">YES (${b.nftBalance})</span>`
+                    : `<span style="color: #333;">NO</span>`;
+            }
+
             return `
             <tr>
                 <td class="wallet-address"><a href="https://etherscan.io/address/${b.address}" target="_blank">${truncateAddress(b.address)}</a></td>
@@ -330,6 +405,7 @@ function renderTable() {
                 </td>
                 <td class="amount fdv">${hasBid ? '$' + b.latestBidFdv.toFixed(4) : '-'}</td>
                 <td class="amount fdv">${hasBid ? '$' + b.avgBidFdv.toFixed(4) : '-'}</td>
+                <td class="amount">${nftDisplay}</td>
             </tr>
             `;
         }).join('');
