@@ -22,6 +22,7 @@ const elements = {
     totalBids: document.getElementById('totalBids'),
     totalShielded: document.getElementById('totalShielded'),
     auctionShielded: document.getElementById('auctionShielded'),
+    avgBidFdv: document.getElementById('avgBidFdv'),
     auctionStart: document.getElementById('auctionStart'),
     auctionEnd: document.getElementById('auctionEnd'),
     tokenSupply: document.getElementById('tokenSupply'),
@@ -267,6 +268,11 @@ function updateStats() {
     // Sum of net shielded (wrapped - unwrapped) for all auction participants
     const totalAuctionShielded = list.reduce((sum, b) => sum + (b.wrapped - b.unwrapped), 0n);
     elements.auctionShielded.textContent = formatUSDT(totalAuctionShielded);
+    // Calculate average bid FDV
+    const totalBidCount = list.reduce((s, b) => s + b.bidCount, 0);
+    const sumBidFdv = list.reduce((sum, b) => sum + (b.latestBidFdv * b.bidCount), 0);
+    const avgBid = totalBidCount > 0 ? sumBidFdv / totalBidCount : 0;
+    elements.avgBidFdv.textContent = '$' + avgBid.toFixed(4);
 }
 
 function renderTable() {

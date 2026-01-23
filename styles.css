@@ -206,7 +206,7 @@ body {
 
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: var(--spacing-md);
 }
 
@@ -664,7 +664,7 @@ h2 {
 /* Tablet (1024px and below) */
 @media (max-width: 1024px) {
     .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(3, 1fr);
     }
 
     .info-grid {
@@ -674,13 +674,33 @@ h2 {
     .container {
         padding: 0 var(--spacing-md);
     }
+
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-md);
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+    }
 }
 
 /* Mobile (768px and below) */
 @media (max-width: 768px) {
+    .app-container {
+        padding: var(--spacing-md);
+    }
+
     .stats-grid {
-        grid-template-columns: 1fr;
-        gap: var(--spacing-md);
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--spacing-sm);
     }
 
     .info-grid {
@@ -692,15 +712,26 @@ h2 {
         align-items: flex-start;
         gap: var(--spacing-md);
         padding: var(--spacing-md);
+        margin-bottom: var(--spacing-lg);
     }
 
-    .header-left {
-        width: 100%;
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-md);
     }
 
-    .header-right {
+    .header-actions {
         width: 100%;
-        justify-content: space-between;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+    }
+
+    .update-info {
+        flex-direction: row;
+        align-items: center;
+        gap: var(--spacing-sm);
     }
 
     .stat-card {
@@ -708,45 +739,57 @@ h2 {
     }
 
     .stat-value {
-        font-size: 1.5rem;
+        font-size: 1.25rem;
+    }
+
+    .stat-label {
+        font-size: 0.6rem;
+    }
+
+    /* Info Row */
+    .info-row {
+        flex-wrap: wrap;
+        gap: var(--spacing-md);
+    }
+
+    .info-item {
+        min-width: 45%;
     }
 
     /* Table: Horizontal Scroll */
-    .table-wrapper {
+    .table-container {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
     }
 
-    .bidders-table {
+    .data-table {
         min-width: 700px;
     }
 
-    .bidders-table th,
-    .bidders-table td {
+    .data-table th,
+    .data-table td {
         padding: 10px 8px;
         font-size: 0.75rem;
     }
 
-    /* Distribution List */
-    .chart-section {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .legend-item {
-        width: 100%;
-        max-width: 300px;
-    }
-
     /* Filters */
-    .filters {
+    .filters-bar {
         flex-direction: column;
+        gap: var(--spacing-sm);
+        align-items: stretch;
+    }
+
+    .search-box {
+        width: 100%;
+    }
+
+    .filter-options {
+        display: flex;
         gap: var(--spacing-sm);
     }
 
-    .filters input,
-    .filters select {
-        width: 100%;
+    .filter-options select {
+        flex: 1;
     }
 
     /* Pagination */
@@ -758,37 +801,50 @@ h2 {
 
 /* Small Mobile (480px and below) */
 @media (max-width: 480px) {
-    .container {
-        padding: 0 var(--spacing-sm);
+    .app-container {
+        padding: var(--spacing-sm);
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
     }
 
     .header h1 {
         font-size: 1.2rem;
     }
 
-    .stat-value {
-        font-size: 1.25rem;
+    .logo-text h1 {
+        font-size: 1.4rem;
     }
 
-    .stat-label {
+    .logo-text .subtitle {
         font-size: 0.65rem;
     }
 
-    .info-value {
-        font-size: 0.85rem;
+    .profile-logo {
+        width: 40px;
+        height: 40px;
     }
 
-    .legend-item {
-        padding: 4px 8px;
-        height: 28px;
+    .stat-value {
+        font-size: 1.1rem;
+    }
+
+    .stat-label {
+        font-size: 0.55rem;
+    }
+
+    .info-value {
+        font-size: 0.8rem;
+    }
+
+    .info-item {
         min-width: 100%;
     }
 
-    .legend-label {
-        font-size: 0.7rem;
-    }
-
-    .legend-value {
+    .data-table th,
+    .data-table td {
+        padding: 8px 6px;
         font-size: 0.7rem;
     }
 }
