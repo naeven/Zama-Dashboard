@@ -574,19 +574,17 @@ function renderBidDistribution() {
     if (list.length === 0) { elements.chartSection.style.display = 'none'; return; }
     elements.chartSection.style.display = 'flex';
 
-    // Define buckets with bid count and cancellation count
+    // Original bucket definitions matching user's UI
     const buckets = {
-        '$0.005-$0.01': { bids: 0, canceled: 0 },
-        '$0.01-$0.025': { bids: 0, canceled: 0 },
-        '$0.025-$0.05': { bids: 0, canceled: 0 },
-        '$0.05-$0.10': { bids: 0, canceled: 0 },
-        '$0.10-$0.25': { bids: 0, canceled: 0 },
-        '$0.25-$0.50': { bids: 0, canceled: 0 },
-        '$0.50-$1.00': { bids: 0, canceled: 0 },
-        '$1.00+': { bids: 0, canceled: 0 }
+        '< $0.01': { bids: 0, canceled: 0 },
+        '$0.01 - $0.02': { bids: 0, canceled: 0 },
+        '$0.02 - $0.03': { bids: 0, canceled: 0 },
+        '$0.03 - $0.04': { bids: 0, canceled: 0 },
+        '$0.04 - $0.05': { bids: 0, canceled: 0 },
+        '$0.05 - $0.10': { bids: 0, canceled: 0 },
+        '$0.10+': { bids: 0, canceled: 0 }
     };
 
-    let totalBids = 0;
     list.forEach(b => {
         if (b.bidCount === 0) return;
 
@@ -595,58 +593,38 @@ function renderBidDistribution() {
         const canceled = b.canceledCount || 0;
 
         let bucketKey;
-        if (p >= 1.00) bucketKey = '$1.00+';
-        else if (p >= 0.50) bucketKey = '$0.50-$1.00';
-        else if (p >= 0.25) bucketKey = '$0.25-$0.50';
-        else if (p >= 0.10) bucketKey = '$0.10-$0.25';
-        else if (p >= 0.05) bucketKey = '$0.05-$0.10';
-        else if (p >= 0.025) bucketKey = '$0.025-$0.05';
-        else if (p >= 0.01) bucketKey = '$0.01-$0.025';
-        else if (p >= 0.005) bucketKey = '$0.005-$0.01';
+        if (p >= 0.10) bucketKey = '$0.10+';
+        else if (p >= 0.05) bucketKey = '$0.05 - $0.10';
+        else if (p >= 0.04) bucketKey = '$0.04 - $0.05';
+        else if (p >= 0.03) bucketKey = '$0.03 - $0.04';
+        else if (p >= 0.02) bucketKey = '$0.02 - $0.03';
+        else if (p >= 0.01) bucketKey = '$0.01 - $0.02';
+        else bucketKey = '< $0.01';
 
         if (bucketKey) {
             buckets[bucketKey].bids += count;
             buckets[bucketKey].canceled += canceled;
-            totalBids += count;
         }
     });
 
-    // Find top 3 buckets by bid count
-    const sortedKeys = Object.keys(buckets).sort((a, b) => buckets[b].bids - buckets[a].bids);
-    const top3Keys = sortedKeys.slice(0, 3).filter(k => buckets[k].bids > 0);
-
-    // Build header
-    elements.chartLegend.innerHTML = `
-        <div class="price-levels-header">
-            <span class="header-title">PRICE LEVELS</span>
-            <span class="total-badge">Total bids: ${formatNumber(totalBids)}</span>
-            <span class="legend-info">🔒 Totals encrypted</span>
-            <span class="legend-info highlight">● Top 3 most bid</span>
-        </div>
-    `;
+    const colors = ['#FFE600', '#E6CF00', '#00FF94', '#00E685', '#FFFFFF', '#E0E0E0', '#888888', '#333333'];
+    elements.chartLegend.innerHTML = '<div style="color:#888888;font-family:JetBrains Mono;font-size:12px;font-weight:bold;margin-bottom:12px;">BID COUNT DISTRIBUTION // BY FDV PRICE ($)</div>';
 
     const grid = document.createElement('div');
     grid.className = 'distribution-grid';
 
-    Object.entries(buckets).forEach(([key, data]) => {
+    Object.entries(buckets).forEach(([key, data], i) => {
         if (data.bids > 0) {
-            const isTop = top3Keys.includes(key);
             const card = document.createElement('div');
-            card.className = 'range-card' + (isTop ? ' top-bucket' : '');
+            card.className = 'range-card';
+            card.style.borderLeftColor = colors[i % colors.length];
 
             let cancelHtml = '';
             if (data.canceled > 0) {
-                cancelHtml = `<span class="cancel-count">-${data.canceled}</span>`;
+                cancelHtml = `<span class="cancel-count">-${data.canceled} canceled</span>`;
             }
 
-            card.innerHTML = `
-                <span class="range-label">${key}</span>
-                <div class="range-stats">
-                    <span class="range-value">${data.bids}</span>
-                    <span class="lock-icon">🔒</span>
-                </div>
-                ${cancelHtml}
-            `;
+            card.innerHTML = `<span class="range-label">${key}</span><span class="range-value">${data.bids}</span>${cancelHtml}`;
             grid.appendChild(card);
         }
     });
