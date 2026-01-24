@@ -43,8 +43,17 @@ export default async function handler(req, res) {
 
         // 1. Check Redis Cache First
         const { force } = req.query;
+
+        // [New] If Force Refresh is requested, reset the cancellation sync state to ensure full accuracy
+        if (force === 'true') {
+            console.log('Force refresh: Resetting cancellation sync state...');
+            await redis.del(REDIS_KEY_CANCELLATIONS);
+            await redis.del(REDIS_KEY_LAST_BLOCK);
+        }
+
         const cached = await redis.get(CACHE_KEY);
         const now = Date.now();
+
 
         if (cached && cached.cached_at && !force) {
             const cacheAgeSeconds = Math.floor((now - cached.cached_at) / 1000);
@@ -210,7 +219,9 @@ export default async function handler(req, res) {
 // --- Incremental Sync Logic ---
 
 async function syncCancellations() {
-    const MAX_BLOCK_RANGE = 2000;
+    // Alchemy allows wider ranges for filtered queries (topic + address). 
+    // Sparse events mean we can query 1M blocks safely if result set is small.
+    const MAX_BLOCK_RANGE = 2000000;
     const DEFAULT_START_BLOCK_HEX = '0x1312D00'; // Approx Start Block (~20M)
     const SYNC_LOCK_KEY = 'zama:cancellations:sync_lock';
 
