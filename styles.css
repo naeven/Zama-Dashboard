@@ -1144,14 +1144,131 @@ input:checked+.slider:before {
     font-family: 'JetBrains Mono', monospace;
 }
 
-/* Chart Section (Legacy - keep for compatibility) */
+/* Chart Section (Price Levels) */
 .chart-section {
-    display: none;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-legend {
+    width: 100%;
+}
+
+.price-levels-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.header-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--zama-white);
+    letter-spacing: 1px;
+}
+
+.total-badge {
+    background: var(--bg-tertiary);
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    color: var(--zama-grey);
+    font-family: 'JetBrains Mono', monospace;
+    border: 1px solid var(--border-color);
+}
+
+.legend-info {
+    font-size: 0.7rem;
+    color: var(--zama-grey);
+    margin-left: auto;
+}
+
+.legend-info.highlight {
+    color: var(--zama-yellow);
+    margin-left: var(--spacing-md);
+}
+
+/* Distribution Grid */
+.distribution-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+}
+
+.range-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    padding: var(--spacing-md);
+    min-width: 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.range-card:hover {
+    border-color: var(--zama-grey);
+}
+
+.range-card.top-bucket {
+    border-color: var(--zama-yellow);
+    background: rgba(255, 230, 0, 0.05);
+}
+
+.range-card.top-bucket::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--zama-yellow);
+}
+
+.range-label {
+    font-size: 0.75rem;
+    color: var(--zama-grey);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.range-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.range-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--zama-yellow);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.lock-icon {
+    font-size: 0.9rem;
+    opacity: 0.6;
+}
+
+.cancel-count {
+    font-size: 0.7rem;
+    color: var(--error);
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
 }
 
 @media (max-width: 768px) {
-    .price-grid {
-        grid-template-columns: repeat(2, 1fr);
+    .distribution-grid {
+        flex-direction: column;
+    }
+
+    .range-card {
+        min-width: 100%;
     }
 
     .price-levels-header {
@@ -1159,7 +1276,7 @@ input:checked+.slider:before {
         align-items: flex-start;
     }
 
-    .price-legend {
+    .legend-info {
         margin-left: 0;
     }
 }
