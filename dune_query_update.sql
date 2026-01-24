@@ -1,6 +1,7 @@
 -- Dune SQL Query for Zama Auction Dashboard
 -- Query ID: 6586283
 -- Combined Query: Uses user's proven logic for Bids/Wraps/Unwraps + Full Outer Join for passive holders
+-- UPDATED: Added Cancellation Events tracking
 
 WITH bid_events AS (
     -- Fetch BidSubmitted events using raw logs
@@ -16,6 +17,16 @@ WITH bid_events AS (
       AND topic0 = 0x5986d4da84b4e4719683f1ba6994a5bac9ff76c75db61b1a949e5b7d3424e892
 ),
 
+-- [NEW] Cancellation Events
+cancel_events AS (
+    SELECT
+        bytearray_substring(topic2, 13, 20) AS bidder_address_bytes,
+        tx_hash
+    FROM ethereum.logs
+    WHERE contract_address = 0x04a5b8C32f9c38092B008A4939f1F91D550C4345
+      AND topic0 = 0xbd8de31a25c2b7c2ddafffe72dab91b4ce5826cfd5664793eb206f572f732c27
+),
+
 latest_bids AS (
     SELECT
         bidder_address_bytes,
@@ -27,10 +38,21 @@ latest_bids AS (
 bid_stats AS (
     SELECT
         bidder_address_bytes,
-        COUNT(tx_hash) AS bid_count,
+        COUNT(tx_hash) AS total_bids_placed, -- Renamed for clarity
         MAX(block_time) AS last_bid_time,
-        AVG(CAST(bid_price_raw AS double) / 1e6) AS avg_bid_fdv
+        AVG(CAST(bid_price_raw AS double) / 1e6) AS avg_bid_fdv,
+        MIN(CAST(bid_price_raw AS double) / 1e6) AS min_bid_fdv,
+        MAX(CAST(bid_price_raw AS double) / 1e6) AS max_bid_fdv
     FROM bid_events
+    GROUP BY 1
+),
+
+-- [NEW] Aggregate Cancellations per bidder
+cancel_stats AS (
+    SELECT
+        bidder_address_bytes,
+        COUNT(tx_hash) AS canceled_count
+    FROM cancel_events
     GROUP BY 1
 ),
 
@@ -69,8 +91,14 @@ balances AS (
 )
 
 SELECT
-    '0x' || to_hex(COALESCE(b.address_bytes, bs.bidder_address_bytes)) AS bidder_address,
-    COALESCE(bs.bid_count, 0) AS bid_count,
+    '0x' || to_hex(COALESCE(b.address_bytes, bs.bidder_address_bytes, cs.bidder_address_bytes)) AS bidder_address,
+    
+    -- [UPDATED] Active Bids = Placed - Canceled
+    GREATEST(0, COALESCE(bs.total_bids_placed, 0) - COALESCE(cs.canceled_count, 0)) AS bid_count,
+    
+    -- [NEW] Expose canceled count for UI
+    COALESCE(cs.canceled_count, 0) AS canceled_count,
+    
     COALESCE(b.total_wrapped, 0) AS total_wrapped,
     COALESCE(b.total_unwrapped, 0) AS total_unwrapped,
     COALESCE(b.net_shielded, 0) AS net_shielded,
@@ -85,9 +113,12 @@ SELECT
     ) AS latest_bid_fdv,
     
     COALESCE(bs.avg_bid_fdv, 0) AS avg_bid_fdv,
+    COALESCE(bs.min_bid_fdv, 0) AS min_bid_fdv,
+    COALESCE(bs.max_bid_fdv, 0) AS max_bid_fdv,
     bs.last_bid_time
 
 FROM balances b
 FULL OUTER JOIN bid_stats bs ON b.address_bytes = bs.bidder_address_bytes
-WHERE (COALESCE(b.net_shielded, 0) > 0.01 OR COALESCE(bs.bid_count, 0) > 0)
+FULL OUTER JOIN cancel_stats cs ON COALESCE(b.address_bytes, bs.bidder_address_bytes) = cs.bidder_address_bytes
+WHERE (COALESCE(b.net_shielded, 0) > 0.01 OR COALESCE(bs.total_bids_placed, 0) > 0)
 ORDER BY net_shielded DESC

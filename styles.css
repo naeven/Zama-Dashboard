@@ -968,5 +968,198 @@ input:checked+.slider:before {
         margin-bottom: 10px;
     }
 }
+
 /* Stats Header */
-.stats-header { display: flex; justify-content: flex-start; margin-bottom: var(--spacing-md); background: var(--bg-secondary); border: 1px solid var(--border-color); padding: var(--spacing-md); border-left: 4px solid var(--error); } .stats-summary-block { display: flex; flex-direction: column; } .summary-label { font-size: 0.7rem; text-transform: uppercase; color: var(--zama-grey); font-weight: 700; margin-bottom: 4px; } .summary-value { font-size: 1.5rem; color: var(--zama-white); font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+.stats-header {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: var(--spacing-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: var(--spacing-md);
+    border-left: 4px solid var(--zama-yellow);
+}
+
+.stats-summary-block {
+    display: flex;
+    flex-direction: column;
+}
+
+.summary-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: var(--zama-grey);
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.summary-value {
+    font-size: 1.5rem;
+    color: var(--zama-white);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+}
+
+/* Canceled Stat Card */
+.stat-card.canceled {
+    border-left: 4px solid var(--error);
+}
+
+.stat-card.canceled .stat-value {
+    color: var(--error);
+}
+
+/* Price Levels Section */
+.price-levels-section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.price-levels-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.price-levels-header h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--zama-white);
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.total-bids-badge {
+    background: var(--bg-tertiary);
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    color: var(--zama-grey);
+    font-family: 'JetBrains Mono', monospace;
+    border: 1px solid var(--border-color);
+}
+
+.price-legend {
+    display: flex;
+    gap: var(--spacing-md);
+    margin-left: auto;
+    font-size: 0.7rem;
+    color: var(--zama-grey);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.legend-item.highlight .legend-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--zama-yellow);
+    border-radius: 50%;
+}
+
+.legend-icon.lock {
+    font-size: 0.8rem;
+}
+
+/* Price Grid */
+.price-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--spacing-sm);
+}
+
+.price-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.price-card:hover {
+    border-color: var(--zama-grey);
+    transform: translateY(-2px);
+}
+
+.price-card.top-bucket {
+    border-color: var(--zama-yellow);
+    background: rgba(255, 230, 0, 0.05);
+}
+
+.price-card.top-bucket::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--zama-yellow);
+}
+
+.price-range {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--zama-white);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.price-stats {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.bid-count-display {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--zama-yellow);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.encrypted-indicator {
+    font-size: 0.7rem;
+    color: var(--zama-grey);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.cancel-badge {
+    background: rgba(255, 82, 82, 0.15);
+    border: 1px solid var(--error);
+    color: var(--error);
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* Chart Section (Legacy - keep for compatibility) */
+.chart-section {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .price-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .price-levels-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .price-legend {
+        margin-left: 0;
+    }
+}

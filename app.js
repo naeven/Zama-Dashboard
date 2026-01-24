@@ -38,8 +38,9 @@ const elements = {
     sortOrder: document.getElementById('sortOrder'),
     lastUpdated: document.getElementById('lastUpdated'),
     dataAge: document.getElementById('dataAge'),
-    chartSection: document.querySelector('.chart-section'),
-    chartLegend: document.getElementById('chartLegend'),
+    priceLevelsSection: document.getElementById('priceLevelsSection'),
+    priceGrid: document.getElementById('priceGrid'),
+    totalBidsBadge: document.getElementById('totalBidsBadge'),
     statsToggle: document.getElementById('statsToggle'),
     statsHeader: document.getElementById('statsHeader'),
     totalCanceledBids: document.getElementById('totalCanceledBids'),
@@ -202,6 +203,7 @@ async function processDuneResults(rows) {
         bidders.set(address.toLowerCase(), {
             address: address,
             bidCount: parseInt(row.bid_count || 0), // This is Net Active Bids from SQL
+            canceledCount: canceledCount, // Total cancellations for this user
             wrapped: BigInt(Math.floor(parseFloat(row.total_wrapped || 0) * 1e6)),
             unwrapped: BigInt(Math.floor(parseFloat(row.total_unwrapped || 0) * 1e6)),
             latestBidFdv: parseFloat(row.latest_bid_fdv || 0),
@@ -218,7 +220,7 @@ async function processDuneResults(rows) {
     }
 
     updateStats();
-    renderBidDistribution();
+    renderPriceLevels();
     renderTable();
     setLoading(false);
 }
@@ -566,39 +568,73 @@ function updatePagination(totalPages) {
 
 window.changePage = (delta) => { currentPage += delta; renderTable(); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
-function renderBidDistribution() {
+function renderPriceLevels() {
     const list = Array.from(bidders.values());
-    if (list.length === 0) { elements.chartSection.style.display = 'none'; return; }
-    elements.chartSection.style.display = 'flex';
+    if (!elements.priceGrid) return;
 
-    const buckets = { '$0.005 - $0.01': 0, '$0.01 - $0.025': 0, '$0.025 - $0.05': 0, '$0.05 - $0.10': 0, '$0.10 - $0.25': 0, '$0.25 - $0.50': 0, '$0.50 - $1.00': 0, '$1.00+': 0 };
+    // Define price buckets
+    const bucketDefs = [
+        { key: '$0.005-$0.01', min: 0.005, max: 0.01 },
+        { key: '$0.01-$0.025', min: 0.01, max: 0.025 },
+        { key: '$0.025-$0.05', min: 0.025, max: 0.05 },
+        { key: '$0.05-$0.10', min: 0.05, max: 0.10 },
+        { key: '$0.10-$0.25', min: 0.10, max: 0.25 },
+        { key: '$0.25-$0.50', min: 0.25, max: 0.50 },
+        { key: '$0.50-$1.00', min: 0.50, max: 1.00 },
+        { key: '$1.00+', min: 1.00, max: Infinity }
+    ];
+
+    // Initialize buckets with bid count and cancellation count
+    const buckets = bucketDefs.map(def => ({
+        ...def,
+        bidCount: 0,
+        canceledCount: 0
+    }));
+
+    // Populate buckets based on latestBidFdv
+    let totalBids = 0;
     list.forEach(b => {
-        // Only count active bidders
-        if (b.bidCount === 0) return;
+        if (b.bidCount === 0) return; // Only count active bidders
 
         const p = b.latestBidFdv;
-        const count = b.bidCount;
-        if (p >= 1.00) buckets['$1.00+'] += count;
-        else if (p >= 0.50) buckets['$0.50 - $1.00'] += count;
-        else if (p >= 0.25) buckets['$0.25 - $0.50'] += count;
-        else if (p >= 0.10) buckets['$0.10 - $0.25'] += count;
-        else if (p >= 0.05) buckets['$0.05 - $0.10'] += count;
-        else if (p >= 0.025) buckets['$0.025 - $0.05'] += count;
-        else if (p >= 0.01) buckets['$0.01 - $0.025'] += count;
-        else if (p >= 0.005) buckets['$0.005 - $0.01'] += count;
+        for (const bucket of buckets) {
+            if (p >= bucket.min && (bucket.max === Infinity || p < bucket.max)) {
+                bucket.bidCount += b.bidCount;
+                // Attribute cancellations to the user's latest bid bucket (heuristic)
+                bucket.canceledCount += (parseInt(b.canceledCount) || 0);
+                break;
+            }
+        }
+        totalBids += b.bidCount;
     });
 
-    const colors = ['#FFE600', '#E6CF00', '#00FF94', '#00E685', '#FFFFFF', '#E0E0E0', '#888888', '#333333'];
-    elements.chartLegend.innerHTML = '<div style="color:#888888;font-family:JetBrains Mono;font-size:12px;font-weight:bold;margin-bottom:12px;">BID COUNT DISTRIBUTION // BY FDV PRICE ($)</div>';
-    const grid = document.createElement('div'); grid.className = 'distribution-grid';
-    Object.entries(buckets).forEach(([key, val], i) => {
-        if (val > 0) {
-            const card = document.createElement('div'); card.className = 'range-card'; card.style.borderLeftColor = colors[i % colors.length];
-            card.innerHTML = `<span class="range-label">${key}</span><span class="range-value">${val}</span>`;
-            grid.appendChild(card);
-        }
-    });
-    elements.chartLegend.appendChild(grid);
+    // Find top 3 buckets by bid count
+    const sortedBuckets = [...buckets].sort((a, b) => b.bidCount - a.bidCount);
+    const top3Keys = sortedBuckets.slice(0, 3).filter(b => b.bidCount > 0).map(b => b.key);
+
+    // Update total bids badge
+    if (elements.totalBidsBadge) {
+        elements.totalBidsBadge.textContent = `Total bids: ${formatNumber(totalBids)}`;
+    }
+
+    // Render price cards
+    elements.priceGrid.innerHTML = buckets
+        .filter(b => b.bidCount > 0)
+        .map(bucket => {
+            const isTop = top3Keys.includes(bucket.key);
+            const hasCancellations = bucket.canceledCount > 0;
+
+            return `
+                <div class="price-card ${isTop ? 'top-bucket' : ''}">
+                    <span class="price-range">${bucket.key}</span>
+                    <div class="price-stats">
+                        <span class="bid-count-display">${bucket.bidCount}</span>
+                        <span class="encrypted-indicator">🔒</span>
+                    </div>
+                    ${hasCancellations ? `<span class="cancel-badge">-${bucket.canceledCount} canceled</span>` : ''}
+                </div>
+            `;
+        }).join('');
 }
 
 // --- Utils ---

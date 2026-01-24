@@ -63,15 +63,26 @@
                     <span class="stat-label">Auction Shielded USDT</span>
                     <span class="stat-value" id="auctionShielded">-</span>
                 </div>
-                <!-- New FDV Stats -->
-                <!-- FDV Stats removed per user request (moved to table rows) -->
+                <div class="stat-card canceled">
+                    <span class="stat-label">Total Canceled Bids</span>
+                    <span class="stat-value" id="totalCanceledBids">-</span>
+                </div>
             </div>
         </section>
 
-        <!-- Chart Section -->
-        <!-- Chart Section (Now just List) -->
-        <section class="chart-section" style="display: none;">
-            <div id="chartLegend" class="chart-legend"></div>
+        <!-- Price Levels Grid -->
+        <section class="price-levels-section" id="priceLevelsSection">
+            <div class="price-levels-header">
+                <h2>Price Levels</h2>
+                <span class="total-bids-badge" id="totalBidsBadge">Total bids: -</span>
+                <div class="price-legend">
+                    <span class="legend-item"><span class="legend-icon lock">🔒</span> Totals encrypted</span>
+                    <span class="legend-item highlight"><span class="legend-dot"></span> Top 3 most bid</span>
+                </div>
+            </div>
+            <div class="price-grid" id="priceGrid">
+                <!-- Price cards will be populated by JS -->
+            </div>
         </section>
 
         <!-- Auction Info -->
@@ -134,8 +145,8 @@
             <!-- Stats View Header (Hidden by default) -->
             <div id="statsHeader" class="stats-header" style="display: none;">
                 <div class="stats-summary-block">
-                    <span class="summary-label">TOTAL CANCELED BIDS</span>
-                    <span class="summary-value" id="totalCanceledBids">-</span>
+                    <span class="summary-label">SHOWING TOP 20 BY NET SHIELDED</span>
+                    <span class="summary-value">All Wallets</span>
                 </div>
             </div>
 
