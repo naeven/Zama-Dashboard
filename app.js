@@ -122,7 +122,7 @@ async function fetchDashboardData() {
 
         // Process the rows
         if (data.rows && data.rows.length > 0) {
-            await processDuneResults(data.rows, data.cancellations);
+            await processDuneResults(data.rows);
         }
 
         // Update UI with cache info from server
@@ -186,16 +186,22 @@ function updateCacheInfo(data) {
     }
 }
 
-async function processDuneResults(rows, cancellations = {}) {
+async function processDuneResults(rows) {
     bidders.clear();
+    let totalCancellations = 0;
 
-    // First pass: Populate bidders from Dune
+    // Populate bidders from Dune (Query 6586283 now handles all logic)
     for (const row of rows) {
         if (!row.bidder_address) continue;
         const address = String(row.bidder_address);
+
+        // Cancellation count comes directly from Dune now
+        const canceledCount = parseInt(row.canceled_count || 0);
+        totalCancellations += canceledCount;
+
         bidders.set(address.toLowerCase(), {
             address: address,
-            bidCount: parseInt(row.bid_count || 0),
+            bidCount: parseInt(row.bid_count || 0), // This is Net Active Bids from SQL
             wrapped: BigInt(Math.floor(parseFloat(row.total_wrapped || 0) * 1e6)),
             unwrapped: BigInt(Math.floor(parseFloat(row.total_unwrapped || 0) * 1e6)),
             latestBidFdv: parseFloat(row.latest_bid_fdv || 0),
@@ -203,19 +209,6 @@ async function processDuneResults(rows, cancellations = {}) {
             maxBidFdv: parseFloat(row.max_bid_fdv || 0),
             avgBidFdv: parseFloat(row.avg_bid_fdv || 0),
             lastBidTime: row.last_bid_time ? new Date(row.last_bid_time.replace(' UTC', 'Z').replace(' ', 'T')).getTime() : 0
-        });
-    }
-
-    // Second pass: Filter Canceled Bids using Server Data
-    let totalCancellations = 0;
-    if (cancellations) {
-        Object.entries(cancellations).forEach(([bidder, count]) => {
-            const b = bidders.get(bidder.toLowerCase());
-            const cancelCount = parseInt(count);
-            totalCancellations += cancelCount;
-            if (b) {
-                b.bidCount = Math.max(0, b.bidCount - cancelCount);
-            }
         });
     }
 
