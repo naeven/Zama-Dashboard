@@ -968,3 +968,5 @@ input:checked+.slider:before {
         margin-bottom: 10px;
     }
 }
+/* Stats Header */
+.stats-header { display: flex; justify-content: flex-start; margin-bottom: var(--spacing-md); background: var(--bg-secondary); border: 1px solid var(--border-color); padding: var(--spacing-md); border-left: 4px solid var(--error); } .stats-summary-block { display: flex; flex-direction: column; } .summary-label { font-size: 0.7rem; text-transform: uppercase; color: var(--zama-grey); font-weight: 700; margin-bottom: 4px; } .summary-value { font-size: 1.5rem; color: var(--zama-white); font-family: 'JetBrains Mono', monospace; font-weight: 700; }

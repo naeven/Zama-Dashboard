@@ -94,14 +94,31 @@ async function fetchDashboardData() {
         setLoading(true, 'Fetching data from server...');
 
         // Simple call to server - server handles all caching
-        const response = await fetch('/api/dune');
+        // Smart Cache Busting: If we suspect stale data, we force refresh.
+        let response = await fetch('/api/dune');
 
         if (!response.ok) {
             const err = await response.json();
             throw new Error(err.error || 'Server error');
         }
 
-        const data = await response.json();
+        let data = await response.json();
+
+        // Check for Stale Data (Missing Min/Max columns from old query)
+        // If the first row exists but has 0/undefined for min_bid_fdv where latest > 0, it's stale.
+        const isStale = data.rows && data.rows.length > 0 &&
+            data.rows[0].min_bid_fdv === undefined &&
+            data.rows[0].latest_bid_fdv > 0;
+
+        if (isStale) {
+            console.log('Detected stale data (missing Min/Max columns). Forcing refresh...');
+            setLoading(true, 'Refreshing data cache...');
+            response = await fetch('/api/dune?force=true');
+            if (response.ok) {
+                data = await response.json();
+                console.log('Data refreshed successfully.');
+            }
+        }
 
         // Process the rows
         if (data.rows && data.rows.length > 0) {
