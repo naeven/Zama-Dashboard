@@ -44,7 +44,10 @@ const elements = {
     statsToggle: document.getElementById('statsToggle'),
     statsHeader: document.getElementById('statsHeader'),
     avgBidFdvTop50: document.getElementById('avgBidFdvTop50'),
-    tableHead: document.getElementById('tableHead')
+    tableHead: document.getElementById('tableHead'),
+    maxBidFdv: document.getElementById('maxBidFdv'),
+    minBidFdv: document.getElementById('minBidFdv'),
+    avgBidFdv: document.getElementById('avgBidFdv')
 };
 
 // Pagination State
@@ -102,8 +105,9 @@ async function fetchDashboardData() {
         const data = await response.json();
 
         // Process the rows
+        // Process the rows
         if (data.rows && data.rows.length > 0) {
-            processDuneResults(data.rows);
+            await processDuneResults(data.rows, data.cancellations);
         }
 
         // Update UI with cache info from server
@@ -167,8 +171,10 @@ function updateCacheInfo(data) {
     }
 }
 
-function processDuneResults(rows) {
+async function processDuneResults(rows, cancellations = {}) {
     bidders.clear();
+
+    // First pass: Populate bidders from Dune
     for (const row of rows) {
         if (!row.bidder_address) continue;
         const address = String(row.bidder_address);
@@ -180,6 +186,18 @@ function processDuneResults(rows) {
             latestBidFdv: parseFloat(row.latest_bid_fdv || 0),
             avgBidFdv: parseFloat(row.avg_bid_fdv || 0),
             lastBidTime: row.last_bid_time ? new Date(row.last_bid_time.replace(' UTC', 'Z').replace(' ', 'T')).getTime() : 0
+        });
+    }
+
+    // Second pass: Filter Canceled Bids using Server Data
+    if (cancellations) {
+        Object.entries(cancellations).forEach(([bidder, count]) => {
+            const b = bidders.get(bidder.toLowerCase());
+            if (b) {
+                // Ensure count is treated as number
+                const cancelCount = parseInt(count);
+                b.bidCount = Math.max(0, b.bidCount - cancelCount);
+            }
         });
     }
 
@@ -342,6 +360,35 @@ function updateStats() {
         .filter(b => b.bidCount > 0)
         .reduce((sum, b) => sum + (b.wrapped - b.unwrapped), 0n);
     elements.auctionShielded.textContent = formatUSDT(totalAuctionShielded);
+
+    // Calculate Min, Max, Avg FDV for valid bids
+    const activeBidders = list.filter(b => b.bidCount > 0);
+    if (activeBidders.length > 0) {
+        // We use latestBidFdv as a proxy for the user's bid price.
+        const fdvs = activeBidders.map(b => b.latestBidFdv);
+        const maxFdv = Math.max(...fdvs);
+        const minFdv = Math.min(...fdvs);
+
+        // Weighted Average by Bid Count? Or just average of latest bids?
+        // "Avg Price" usually implies average price of all bids.
+        // Since we don't have individual bids, we can estimate: Sum(latestFdv * bidCount) / TotalBids
+        let weightedSum = 0;
+        let totalBids = 0;
+        activeBidders.forEach(b => {
+            // Use avgBidFdv for weighted average calculation to be more accurate
+            weightedSum += b.avgBidFdv * b.bidCount;
+            totalBids += b.bidCount;
+        });
+        const avgFdv = totalBids > 0 ? weightedSum / totalBids : 0;
+
+        elements.maxBidFdv.textContent = '$' + maxFdv.toFixed(4);
+        elements.minBidFdv.textContent = '$' + minFdv.toFixed(4);
+        elements.avgBidFdv.textContent = '$' + avgFdv.toFixed(4);
+    } else {
+        elements.maxBidFdv.textContent = '-';
+        elements.minBidFdv.textContent = '-';
+        elements.avgBidFdv.textContent = '-';
+    }
 }
 
 function renderTable() {
