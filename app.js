@@ -387,13 +387,13 @@ function updateStats() {
         });
         const avgFdv = totalBids > 0 ? weightedSum / totalBids : 0;
 
-        elements.maxBidFdv.textContent = '$' + maxFdv.toFixed(4);
-        elements.minBidFdv.textContent = '$' + minFdv.toFixed(4);
-        elements.avgBidFdv.textContent = '$' + avgFdv.toFixed(4);
+        if (elements.maxBidFdv) elements.maxBidFdv.textContent = '$' + maxFdv.toFixed(4);
+        if (elements.minBidFdv) elements.minBidFdv.textContent = '$' + minFdv.toFixed(4);
+        if (elements.avgBidFdv) elements.avgBidFdv.textContent = '$' + avgFdv.toFixed(4);
     } else {
-        elements.maxBidFdv.textContent = '-';
-        elements.minBidFdv.textContent = '-';
-        elements.avgBidFdv.textContent = '-';
+        if (elements.maxBidFdv) elements.maxBidFdv.textContent = '-';
+        if (elements.minBidFdv) elements.minBidFdv.textContent = '-';
+        if (elements.avgBidFdv) elements.avgBidFdv.textContent = '-';
     }
 }
 
