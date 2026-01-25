@@ -190,7 +190,7 @@ async function processDuneResults(rows) {
     bidders.clear();
     let totalCancellations = 0;
 
-    // Populate bidders from Dune (Query 6586283 now handles all logic)
+    // Populate bidders from Dune (Query 6592867 now handles all logic)
     for (const row of rows) {
         if (!row.bidder_address) continue;
         const address = String(row.bidder_address);

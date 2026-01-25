@@ -5,7 +5,7 @@ const redis = Redis.fromEnv();
 
 // Cache configuration
 const CACHE_TTL_SECONDS = 3600; // 1 hour (Dune restrictions)
-const DUNE_QUERY_ID = '6586283';
+const DUNE_QUERY_ID = '6592867';
 
 export default async function handler(req, res) {
     const DUNE_API_KEY = process.env.DUNE_API_KEY;
